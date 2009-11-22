@@ -88,7 +88,7 @@ local CharacterGrid = {
 setmetatable(CharacterGrid, CharacterGrid)
 
 CharacterGrid.new = function(width, height, font, px)
-  local o = base.new()
+  local o = base.new(0, 0)
   setmetatable(o, CharacterGrid)
   
   o.mapwidth = width
@@ -99,6 +99,7 @@ CharacterGrid.new = function(width, height, font, px)
     size = px or 10,
     width = 1,
     height = 1,
+    id = nil,
   }
   
   o:ResetGrid()

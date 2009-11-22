@@ -1,5 +1,5 @@
 local MWidget = {
-  IsType = function(self, type)
+  CheckType = function(self, type)
     local self_type = getmetatable(self).__index
     local meta = type.__index
     while self_type ~= nil do
