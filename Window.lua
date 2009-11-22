@@ -17,6 +17,28 @@ local Instance = {
     WindowShow(self.name, false)
   end,
   
+  Move = function(self, x, y)
+    if self.position == nil then
+      self.position = {}
+    end
+    
+    self.position.x = x
+    self.position.y = y
+    self.position.anchor = 0
+    self.position.absolute = true
+  end,
+  
+  Anchor = function(self, anchor)
+    if self.position == nil then
+      self.position = {}
+    end
+    
+    self.position.x = 0
+    self.position.y = 0
+    self.position.anchor = anchor
+    self.position.absolute = false
+  end,
+  
   SelectFont = function(self, fontname, fontsize)
     local fid = nil
     local fontlist = WindowFontList(self.name)
@@ -39,9 +61,14 @@ local Instance = {
     return fid
   end,
   
-  Draw = function(self, position, flags, background)
-    WindowCreate(self.name, self.x, self.y,
-	   self.width, self.height, position, flags, background)
+  Draw = function(self)
+    local flags = self.flags or 0
+    if self.position.absolute then
+      flags = bit.bor(flags, 2)
+    end
+    
+    WindowCreate(self.name, self.position.x, self.position.y,
+	     self.width, self.height, self.position.anchor, flags, self.backcolor)
   end,
   
   Destroy = function(self)
@@ -60,10 +87,11 @@ Window.new = function(name, width, height)
   local o = setmetatable({}, Window)
   
   o.name = GetPluginID() .. ":w" .. #window_list+1
-  o.x = 0
-  o.y = 0
   o.width = width
   o.height = height
+  o.backcolor = 0x000000
+  o.flags = 0
+  o:Move(0, 0)
   
   -- Dummy window.
   WindowCreate(o.name, 0, 0, 0, 0, 0, 0, 0)

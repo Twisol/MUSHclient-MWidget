@@ -3,51 +3,59 @@ local base = require("MWidget\\Window")
 local Instance = {
   __index = base.__index,
   
-  DrawCell = function(self, cell, x, y)
+  Cell = function(self, x, y)
+    if x <= self.mapwidth and y <= self.mapheight and
+	   x >= 1 and y >= 1 then
+      return self.grid[y][x]
+	else
+	  return nil
+	end
+  end,
+  
+  ResetGrid = function(self)
+    local grid = {}
+	
+	for i = 1, self.mapheight do
+	  local line = {}
+	  for j = 1, self.mapwidth do
+	    line[#line+1] = {
+		  char = " ",
+		  forecolor = 0xFFFFFF,
+		  backcolor = 0x000000,
+		  hotspot = nil,
+		}
+	  end
+	  grid[#grid+1] = line
+	end
+	
+	self.grid = grid
+  end,
+  
+  DrawCell = function(self, x, y)
     -- Index into the appropriate cell
-    local x = self.font.width*x
-    local y = self.font.height*y
+    local left = self.font.width*x
+    local top = self.font.height*y
+    local cell = self:Cell(x, y)
+    if cell == nil then
+      return nil, "Invalid cell index."
+    end
     
-    WindowText(self.name, self.font.id, cell.char, x, y, 0, 0, cell.style, false)
+    if cell.backcolor ~= 0x000000 then
+      WindowRectOp(self.name, 2, left, top,
+         left+self.font+width, top+self.font.height, cell.backcolor)
+    end
+    
+    WindowText(self.name, self.font.id, cell.char, left, top, 0, 0, cell.forecolor, false)
     if cell.hotspot then
-      WindowAddHotspot(self.name, self.name .. "-h" .. x .. y,
-         x, y, x+self.font.width, y+self.font.height,
+      WindowAddHotspot(self.name, self.name .. "-h(" .. x .. "," .. y .. ")",
+         left, top, left+self.font.width, top+self.font.height,
          cell.hotspot.mouseover, cell.hotspot.cancelmouseover,
          cell.hotspot.mousedown, cell.hotspot.camcelmousedown,
          cell.hotspot.mouseup, cell.hotspot.tooltip,
          cell.hotspot.cursor, 0)
     end
-  end,
-      
-  DrawRow = function(self, line, row)
-    for i = 1, math.min(table.getn(line), self.mapwidth) do
-      self:DrawCell(line[i], i-1, row)
-    end
-  end,
-  
-  DrawGrid = function(self)
-    for i = 1, math.min(table.getn(self), self.mapheight) do
-      self:DrawRow(self[i], i-1)
-    end
-  end,
-  
-  ResetGrid = function(self)
-    if #self < self.mapheight then
-      for i = #self+1, self.mapwidth do
-        local line = {}
-        for i = 1, self.mapwidth do
-          line[i] = {char = " ", style = 0x000000, hotspot = nil}
-        end
-        table.insert(self, line)
-      end
-    end
     
-    for k,v in ipairs(self) do
-      for k,v in ipairs(v) do
-        v.char = " "
-        v.style = 0x000000
-      end
-    end
+    return true
   end,
   
   Draw = function(self)
@@ -59,8 +67,14 @@ local Instance = {
     self.width = self.font.width * self.mapwidth;
     self.height = self.font.height * self.mapheight;
     
-    base.Draw(self, 6, 2, 0x000000)
-    self:DrawGrid()
+    base.Draw(self)
+	
+    for y = 1, math.min(#self.grid, self.mapheight) do
+	  local row = self.grid[y]
+      for x = 1, math.min(#row, self.mapwidth) do
+	    self:DrawCell(x, y)
+	  end
+    end
   end,
 }
 setmetatable(Instance, Instance)
