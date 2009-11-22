@@ -33,8 +33,8 @@ local Instance = {
   
   DrawCell = function(self, x, y)
     -- Index into the appropriate cell
-    local left = self.font.width*x-self.font.width
-    local top = self.font.height*y-self.font.height
+    local left = self.font.width*(x-1)
+    local top = self.font.height*(y-1)
     
     local cell = self:Cell(x, y)
     if cell == nil then
