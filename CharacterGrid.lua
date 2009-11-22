@@ -33,8 +33,9 @@ local Instance = {
   
   DrawCell = function(self, x, y)
     -- Index into the appropriate cell
-    local left = self.font.width*x
-    local top = self.font.height*y
+    local left = self.font.width*x-self.font.width
+    local top = self.font.height*y-self.font.height
+    
     local cell = self:Cell(x, y)
     if cell == nil then
       return nil, "Invalid cell index."
@@ -70,10 +71,10 @@ local Instance = {
     base.Draw(self)
 	
     for y = 1, math.min(#self.grid, self.mapheight) do
-	  local row = self.grid[y]
+	    local row = self.grid[y]
       for x = 1, math.min(#row, self.mapwidth) do
-	    self:DrawCell(x, y)
-	  end
+	      self:DrawCell(x, y)
+	    end
     end
   end,
 }
