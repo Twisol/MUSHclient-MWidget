@@ -39,37 +39,37 @@ local Instance = {
     self.position.absolute = false
   end,
   
-  SelectFont = function(self, fontname, fontsize)
-    local fid = nil
-    local fontlist = WindowFontList(self.name)
-    
-    if fontlist then
-      for _,v in ipairs(fontlist) do
-        if WindowFontInfo(self.name, v, 21) == fontname and
-           WindowFontInfo(self.name, v, 8) == fontsize then
-          break
-        end
-      end
+  Font = function(self, id, name, size, info_tbl)
+    local ok
+    if info_tbl then
+      ok = WindowFont(self.name, id, name, size,
+         info_tbl.bold, info_tbl.italic, info_tbl.underline, info_tbl.strikeout,
+         info_tbl.charset or 1, info_tbl.pitchandfamily or 0)
+    else
+      ok = WindowFont(self.name, id, name, size, false, false, false, false, 1, 0)
     end
     
-    if not fid then
-      local numfonts = fontlist and #fontlist or 0
-      fid = self.name .. "-f" .. numfonts+1
-      WindowFont(self.name, fid, fontname, fontsize, false, false, false, false, 1, 0)
+    if ok == 30073 then -- eNoSuchWindow
+      return false, "no such window"
+    elseif ok == 30065 then -- eCannotAddFont
+      return false, "unable to add font"
+    else
+      self.fonts[id] = {}
+      return true
     end
-    
-    return fid
   end,
   
-  Draw = function(self)
+  Draw = function(self, show)
     local flags = self.flags or 0
     if self.position.absolute then
       flags = bit.bor(flags, 2)
     end
     
-    WindowDelete(self.name)
     WindowCreate(self.name, self.position.x, self.position.y,
 	     self.width, self.height, self.position.anchor, flags, self.backcolor)
+    if show then
+      WindowShow(self.name, true)
+    end
   end,
   
   Destroy = function(self)
@@ -94,6 +94,7 @@ Window.new = function(width, height)
   o.backcolor = 0x000000
   o.flags = 0
   o.position = {}
+  o.fonts = {}
   
   o:Move(0, 0)
   

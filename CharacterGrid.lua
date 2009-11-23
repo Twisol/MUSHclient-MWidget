@@ -5,36 +5,38 @@ local Instance = {
   
   Cell = function(self, x, y)
     if x <= self.mapwidth and y <= self.mapheight and
-	   x >= 1 and y >= 1 then
+       x >= 1 and y >= 1 then
       return self.grid[y][x]
-	else
-	  return nil
-	end
+    else
+      return nil
+    end
   end,
   
   ResetGrid = function(self)
     local grid = {}
-	
-	for i = 1, self.mapheight do
-	  local line = {}
-	  for j = 1, self.mapwidth do
-	    line[#line+1] = {
-		  char = " ",
-		  forecolor = 0xFFFFFF,
-		  backcolor = 0x000000,
-		  hotspot = nil,
-		}
-	  end
-	  grid[#grid+1] = line
-	end
-	
-	self.grid = grid
+    
+    for i = 1, self.mapheight do
+      local line = {}
+      for j = 1, self.mapwidth do
+        line[#line+1] = {
+          char = " ",
+          forecolor = 0xFFFFFF,
+          backcolor = 0x000000,
+          hotspot = nil,
+        }
+      end
+      grid[#grid+1] = line
+    end
+  
+    self.grid = grid
   end,
   
   DrawCell = function(self, x, y)
     -- Index into the appropriate cell
     local left = self.font.width*(x-1)
     local top = self.font.height*(y-1)
+    local right = left+self.fonts["f"].width
+    local bottom = top+self.fonts["f"].height
     
     local cell = self:Cell(x, y)
     if cell == nil then
@@ -42,11 +44,10 @@ local Instance = {
     end
     
     if cell.backcolor ~= 0x000000 then
-      WindowRectOp(self.name, 2, left, top,
-         left+self.font+width, top+self.font.height, cell.backcolor)
+      WindowRectOp(self.name, 2, left, top, right, bottom, cell.backcolor)
     end
     
-    WindowText(self.name, self.font.id, cell.char, left, top, 0, 0, cell.forecolor, false)
+    WindowText(self.name, "f", cell.char, left, top, 0, 0, cell.forecolor, false)
     if cell.hotspot then
       WindowAddHotspot(self.name, self.name .. "-h(" .. x .. "," .. y .. ")",
          left, top, left+self.font.width, top+self.font.height,
@@ -59,22 +60,27 @@ local Instance = {
     return true
   end,
   
-  Draw = function(self)
-    self.font.id = self:SelectFont(self.font.name, self.font.size)
+  Font = function(self, ...)
+    -- Only needs one font, so don't confuse users with ids.
+    local ok, err = base.Font(self, "f", ...)
+    if ok then
+      self.fonts["f"].width = WindowTextWidth(self.name, "f", "#")
+      self.fonts["f"].height = WindowFontInfo(self.name, "f",  1)
+      
+      self.width = self.fonts["f"].width * self.columns;
+      self.height = self.fonts["f"].height * self.rows;
+    end
+    return ok, err
+  end,
+  
+  Draw = function(self, show)
+    base.Draw(self, show)
     
-    self.font.width = WindowTextWidth(self.name, self.font.id, "#")
-    self.font.height = WindowFontInfo(self.name, self.font.id,  1)
-    
-    self.width = self.font.width * self.mapwidth;
-    self.height = self.font.height * self.mapheight;
-    
-    base.Draw(self)
-	
-    for y = 1, math.min(#self.grid, self.mapheight) do
-	    local row = self.grid[y]
-      for x = 1, math.min(#row, self.mapwidth) do
-	      self:DrawCell(x, y)
-	    end
+    for y = 1, math.min(#self.grid, self.rows) do
+      local row = self.grid[y]
+      for x = 1, math.min(#row, self.columns) do
+        self:DrawCell(x, y)
+      end
     end
   end,
 }
@@ -87,24 +93,15 @@ local CharacterGrid = {
 }
 setmetatable(CharacterGrid, CharacterGrid)
 
-CharacterGrid.new = function(width, height, font, px)
+CharacterGrid.new = function(columns, rows)
   local o = base.new(0, 0)
   setmetatable(o, CharacterGrid)
   
-  o.mapwidth = width
-  o.mapheight = height
+  o.rows = rows
+  o.columns = columns
   
-  o.font = {
-    name = font or "fixedsys",
-    size = px or 10,
-    width = 1,
-    height = 1,
-    id = nil,
-  }
-  
+  o:Font("fixedsys", 10)
   o:ResetGrid()
-  
-  o.font.id = o:SelectFont(o.font.name, o.font.size)
   
   return o
 end
