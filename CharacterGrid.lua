@@ -4,7 +4,7 @@ local Instance = {
   __index = base.__index,
   
   Cell = function(self, x, y)
-    if x <= self.mapwidth and y <= self.mapheight and
+    if x <= self.columns and y <= self.rows and
        x >= 1 and y >= 1 then
       return self.grid[y][x]
     else
@@ -15,17 +15,17 @@ local Instance = {
   ResetGrid = function(self)
     local grid = {}
     
-    for i = 1, self.mapheight do
-      local line = {}
-      for j = 1, self.mapwidth do
-        line[#line+1] = {
+    for i = 1, self.rows do
+      local row = {}
+      for j = 1, self.columns do
+        row[#row+1] = {
           char = " ",
           forecolor = 0xFFFFFF,
           backcolor = 0x000000,
           hotspot = nil,
         }
       end
-      grid[#grid+1] = line
+      grid[#grid+1] = row
     end
   
     self.grid = grid
@@ -33,8 +33,8 @@ local Instance = {
   
   DrawCell = function(self, x, y)
     -- Index into the appropriate cell
-    local left = self.font.width*(x-1)
-    local top = self.font.height*(y-1)
+    local left = self.fonts["f"].width*(x-1)
+    local top = self.fonts["f"].height*(y-1)
     local right = left+self.fonts["f"].width
     local bottom = top+self.fonts["f"].height
     
@@ -50,7 +50,7 @@ local Instance = {
     WindowText(self.name, "f", cell.char, left, top, 0, 0, cell.forecolor, false)
     if cell.hotspot then
       WindowAddHotspot(self.name, self.name .. "-h(" .. x .. "," .. y .. ")",
-         left, top, left+self.font.width, top+self.font.height,
+         left, top, left+self.fonts["f"].width, top+self.fonts["f"].height,
          cell.hotspot.mouseover, cell.hotspot.cancelmouseover,
          cell.hotspot.mousedown, cell.hotspot.camcelmousedown,
          cell.hotspot.mouseup, cell.hotspot.tooltip,

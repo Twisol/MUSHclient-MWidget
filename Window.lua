@@ -54,7 +54,10 @@ local Instance = {
     elseif ok == 30065 then -- eCannotAddFont
       return false, "unable to add font"
     else
-      self.fonts[id] = {}
+      self.fonts[id] = {
+        name = name,
+        size = size,
+      }
       return true
     end
   end,
