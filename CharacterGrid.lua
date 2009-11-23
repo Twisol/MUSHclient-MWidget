@@ -52,7 +52,7 @@ local Instance = {
       WindowAddHotspot(self.name, self.name .. "-h(" .. x .. "," .. y .. ")",
          left, top, left+self.fonts["f"].width, top+self.fonts["f"].height,
          cell.hotspot.mouseover, cell.hotspot.cancelmouseover,
-         cell.hotspot.mousedown, cell.hotspot.camcelmousedown,
+         cell.hotspot.mousedown, cell.hotspot.cancelmousedown,
          cell.hotspot.mouseup, cell.hotspot.tooltip,
          cell.hotspot.cursor, 0)
     end
