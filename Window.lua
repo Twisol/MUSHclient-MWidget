@@ -1,83 +1,15 @@
 local window_list = setmetatable({}, {__mode = "v"})
 
 local Instance = {
-  Clear = function(self, color)
-    WindowRectOp(self.name, 2, 0, 0, 0, 0, color or 0x000000)
-  end,
-  
-  Show = function(self)
-    WindowShow(self.name, true)
-  end,
-  
-  IsShown = function(self)
-    return WindowInfo(self.name, 5)
-  end,
-  
-  Hide = function(self)
-    WindowShow(self.name, false)
-  end,
-  
-  Move = function(self, x, y)
-    if self.position == nil then
-      self.position = {}
-    end
-    
-    self.position.x = x
-    self.position.y = y
-    self.position.anchor = -1
-    self.position.absolute = true
-  end,
-  
-  Anchor = function(self, anchor)
-    if self.position == nil then
-      self.position = {}
-    end
-    
-    self.position.x = -1
-    self.position.y = -1
-    self.position.anchor = anchor
-    self.position.absolute = false
-  end,
-  
-  Font = function(self, id, name, size, info_tbl)
-    local ok
-    if info_tbl then
-      ok = WindowFont(self.name, id, name, size,
-         info_tbl.bold, info_tbl.italic, info_tbl.underline, info_tbl.strikeout,
-         info_tbl.charset or 1, info_tbl.pitchandfamily or 0)
-    else
-      ok = WindowFont(self.name, id, name, size, false, false, false, false, 1, 0)
-    end
-    
-    if ok == 30073 then -- eNoSuchWindow
-      return false, "no such window"
-    elseif ok == 30065 then -- eCannotAddFont
-      return false, "unable to add font"
-    else
-      self.fonts[id] = {
-        name = name,
-        size = size,
-      }
-      return true
-    end
-  end,
-  
-  Draw = function(self, show)
-    local flags = self.flags or 0
-    if self.position.absolute then
-      flags = bit.bor(flags, 2)
-    end
-    
-    WindowCreate(self.name, self.position.x, self.position.y,
-	     self.width, self.height, self.position.anchor, flags, self.backcolor)
-    if show then
-      WindowShow(self.name, true)
-    end
-  end,
-  
-  Destroy = function(self)
-    WindowDelete(self.name)
-  end,
+  Clear = nil,
+  Show = nil,
+  Hide = nil,
+  IsShown = nil,
+  Move = nil,
+  Anchor = nil,
+  Font = nil,
+  Draw = nil,
+  Destroy = nil,
 }
 
 local Window = {
@@ -87,7 +19,7 @@ local Window = {
 }
 setmetatable(Window, Window)
 
-Window.new = function(width, height)
+function Window.new(width, height)
   local o = setmetatable({}, Window)
   window_list[#window_list+1] = o
   
@@ -106,6 +38,98 @@ Window.new = function(width, height)
   WindowShow(o.name, false)
   
   return o
+end
+
+function Instance:Clear(color)
+  WindowRectOp(self.name, 2, 0, 0, 0, 0, color or 0x000000)
+end
+
+function Instance:Show()
+  WindowShow(self.name, true)
+end
+
+function Instance:IsShown()
+  return WindowInfo(self.name, 5)
+end
+
+function Instance:Hide()
+  WindowShow(self.name, false)
+end
+
+function Instance:Move(x, y)
+  if self.position == nil then
+    self.position = {}
+  end
+  
+  self.position.x = x
+  self.position.y = y
+  self.position.anchor = -1
+  self.position.absolute = true
+end
+
+function Instance:Anchor(anchor)
+  if self.position == nil then
+    self.position = {}
+  end
+  
+  self.position.x = -1
+  self.position.y = -1
+  self.position.anchor = anchor
+  self.position.absolute = false
+end
+
+function Instance:Font(id, name, size, info_tbl)
+  local ok
+  if info_tbl then
+    ok = WindowFont(self.name, id, name, size,
+       info_tbl.bold, info_tbl.italic, info_tbl.underline, info_tbl.strikeout,
+       info_tbl.charset or 1, info_tbl.pitchandfamily or 0)
+  else
+    ok = WindowFont(self.name, id, name, size, false, false, false, false, 1, 0)
+  end
+  
+  if ok == 30073 then -- eNoSuchWindow
+    return false, "no such window"
+  elseif ok == 30065 then -- eCannotAddFont
+    return false, "unable to add font"
+  else
+    self.fonts[id] = {
+      name = name,
+      size = size,
+    }
+    return true
+  end
+end
+
+function Instance:Draw()
+  local flags = self.flags or 0
+  if self.position.absolute then
+    flags = bit.bor(flags, 2)
+  end
+  
+  if self.width ~= WindowInfo(self.name, 3) or
+     self.height ~= WindowInfo(self.name, 4) or
+     self.position.anchor ~= WindowInfo(self.name, 7) then
+    local shown = WindowInfo(self.name, 5)
+    WindowCreate(self.name, self.position.x, self.position.y,
+      self.width, self.height, self.position.anchor, flags, self.backcolor)
+    if shown then
+      self:Show()
+    else
+      self:Hide()
+    end
+  else
+    WindowRectOp(self.name, 2, 0, 0, self.width, self.height, self.backcolor)
+    WindowPosition(self.name, self.position.x, self.position.y, self.position.anchor, flags)
+  end
+  
+  if show then
+    WindowShow(self.name, true)
+  end
+end
+
+function Instance:Destroy()
+  WindowDelete(self.name)
 end
 
 return Window
