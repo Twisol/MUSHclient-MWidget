@@ -1,12 +1,14 @@
-local base = require("MWidget\\Window")
+local base = require("MWidget.Window")
 
 local Instance = {
   __index = base.__index,
   
+  HotspotToCell = nil,
   Cell = nil,
   ResetGrid = nil,
   DrawCell = nil,
   Font = nil,
+  Resize = nil,
   Draw = nil,
 }
 setmetatable(Instance, Instance)
@@ -26,10 +28,17 @@ function CharacterGrid.new(columns, rows)
   o.rows = rows
   o.columns = columns
   
-  o:Font("fixedsys", 10)
+  o:Font(GetInfo(20), 10)
   o:ResetGrid()
   
   return o
+end
+
+function Instance:HotspotToCell(hotspot_id)
+  local _, _, x, y = string.find(hotspot_id, "-h%((%d+),(%d+)%)")
+  x, y = tonumber(x), tonumber(y)
+  
+  return grid:Cell(x, y), x, y
 end
 
 function Instance:Cell(x, y)
@@ -37,21 +46,28 @@ function Instance:Cell(x, y)
      x >= 1 and y >= 1 then
     return self.grid[y][x]
   else
-    return nil
+    return nil, "invalid coordinate"
   end
 end
 
 function Instance:ResetGrid()
   local grid = {}
   
-  for i = 1, self.rows do
+  self:DeleteAllHotspots()
+  
+  for y = 1, self.rows do
     local row = {}
-    for j = 1, self.columns do
+    for x = 1, self.columns do
+      local left = self.fonts["f"].width*(x-1)
+      local top = self.fonts["f"].height*(y-1)
+      
       row[#row+1] = {
         char = " ",
         backcolor = self.backcolor,
         forecolor = 0xFFFFFF,
-        hotspot = nil,
+        hotspot = self:AddHotspot("(" .. x .. "," .. y .. ")",
+               left, top,
+               left+self.fonts["f"].width, top+self.fonts["f"].height)
       }
     end
     grid[#grid+1] = row
@@ -72,22 +88,8 @@ function Instance:DrawCell(x, y)
     return nil, "Invalid cell index."
   end
   
-  if cell.backcolor ~= self.backcolor then
-    WindowRectOp(self.name, 2, left, top, right, bottom, cell.backcolor)
-  end
-  
+  WindowRectOp(self.name, 2, left, top, right, bottom, cell.backcolor)
   WindowText(self.name, "f", cell.char, left, top, 0, 0, cell.forecolor, false)
-  if cell.hotspot then
-    local hotspot_id = "h(" .. x .. "," .. y .. ")"
-    if not WindowHotspotInfo(self.name, hotspot_id, 1) then
-      WindowAddHotspot(self.name, hotspot_id,
-         left, top, left+self.fonts["f"].width, top+self.fonts["f"].height,
-         cell.hotspot.mouseover, cell.hotspot.cancelmouseover,
-         cell.hotspot.mousedown, cell.hotspot.cancelmousedown,
-         cell.hotspot.mouseup, cell.hotspot.tooltip,
-         cell.hotspot.cursor, 0)
-    end
-  end
   
   return true
 end
@@ -105,6 +107,31 @@ function Instance:Font(...)
   return ok, err
 end
 
+function Instance:Resize(columns, rows)
+  if columns < 1 or rows < 1 then
+    return nil, "Invalid dimensions."
+  end
+  
+  local oldgrid = self.grid
+  local oldrows = self.rows
+  local oldcolumns = self.columns
+  
+  self.columns = columns
+  self.rows = rows
+  self:ResetGrid()
+  
+  for y = 1, math.min(rows, oldrows) do
+    for x = 1, math.min(columns, oldcolumns) do
+      self.grid[y][x] = oldgrid[y][x]
+    end
+  end
+  
+  self.width = self.fonts["f"].width * self.columns;
+  self.height = self.fonts["f"].height * self.rows;
+  
+  return true
+end
+
 function Instance:Draw()
   base.Draw(self)
   
@@ -116,4 +143,5 @@ function Instance:Draw()
   end
 end
 
+MWidget.CharacterGrid = CharacterGrid
 return CharacterGrid
