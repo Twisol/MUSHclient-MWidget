@@ -1,12 +1,21 @@
 -- Master MWidget package table
-MWidget = {}
+MWidget = MWidget or {}
 
+--- A running count of the number of windows created by MWidget.
+-- It is used to ensure that window names are unique.
+local num_windows = 0
+--- A list of all MWidget-owned windows.
+-- 
+local windows = setmetatable({}, {__mode = "v"})
+
+--- The methods shared by all Window instances.
 local Instance = {
   Show = nil,
   Hide = nil,
   IsShown = nil,
   
   Font = nil,
+  BackColor = nil,
   
   Move = nil,
   Anchor = nil,
@@ -21,23 +30,27 @@ local Instance = {
   DeleteAllHotspots = nil,
 }
 
+--- The base 'class' table for the Window widget type.
 local Window = {
   __index = Instance,
   
-  windows = setmetatable({}, {__mode = "v"}),
   hotspot_handlers = nil,
   
   new = nil,
 }
 setmetatable(Window, Window)
 
+--- Resolves hotspot identifiers and executes the appropriate handler.
+-- @param flags The flags to pass to the handler.
+-- @param id The hotspot ID to be resolved into a window identifier.
+-- @param handler_type The type of hotspot handler to execute.
 local execute_handler = function(flags, id, handler_type)
   local _, _, win_name, hotspot_name = id:find("(w%d+_%w+)-h(.*)")
   if win_name == nil then
     return
   end
   
-  local win = Window.windows[win_name]
+  local win = windows[win_name]
   if win == nil then
     return
   end
@@ -50,6 +63,9 @@ local execute_handler = function(flags, id, handler_type)
   return handler(win, flags, hotspot_name)
 end
 
+--- Base handlers automatically registered to every MWidget hotspot.
+-- They forward requests to the appropriate user-provided handler
+-- through execute_handler().
 local hotspot_handlers = {
   mouseover = function(flags, id)
     return execute_handler(flags, id, "mouseover")
@@ -81,7 +97,7 @@ local hotspot_handlers = {
 }
 Window.hotspot_handlers = hotspot_handlers
 
-local num_windows = 0
+
 function Window.new(width, height)
   local o = setmetatable({}, Window)
   num_windows = num_windows + 1
@@ -90,7 +106,6 @@ function Window.new(width, height)
   o.width = width or 0
   o.height = height or 0
   o.backcolor = 0x000000
-  o.flags = 0
   o.position = {}
   o.fonts = {}
   o.hotspots = {}
@@ -100,7 +115,7 @@ function Window.new(width, height)
   -- Dummy window.
   WindowCreate(o.name, 0, 0, 0, 0, 0, 0, 0)
   
-  Window.windows[o.name] = o
+  windows[o.name] = o
   return o
 end
 
@@ -153,9 +168,9 @@ function Instance:Font(id, name, size, info_tbl)
   end
   
   if ok == error_code.eNoSuchWindow then
-    return false, "no such window"
+    return nil, "no such window"
   elseif ok == error_code.eCannotAddFont then
-    return false, "unable to add font"
+    return nil, "unable to add font"
   else
     self.fonts[id] = {
       name = name,
@@ -165,12 +180,14 @@ function Instance:Font(id, name, size, info_tbl)
   end
 end
 
+function Instance:BackColor(color)
+  self.backcolor = color or 0x000000
+end
+
 function Instance:Draw()
-  local flags = self.flags or 0
-  if self.position.absolute then
-    flags = bit.bor(flags, 2)
-  end
+  local flags = (self.position.absolute and 2 or 0)
   
+  -- Recreate the window if it's been resized or re-anchored.
   if self.width ~= WindowInfo(self.name, 3) or
      self.height ~= WindowInfo(self.name, 4) or
      self.position.anchor ~= WindowInfo(self.name, 7) then

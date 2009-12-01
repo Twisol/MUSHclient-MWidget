@@ -35,7 +35,7 @@ function CharacterGrid.new(columns, rows)
 end
 
 function Instance:HotspotToCell(hotspot_id)
-  local _, _, x, y = string.find(hotspot_id, "-h%((%d+),(%d+)%)")
+  local _, _, x, y = string.find(hotspot_id, "%((%d+),(%d+)%)")
   x, y = tonumber(x), tonumber(y)
   
   return grid:Cell(x, y), x, y
