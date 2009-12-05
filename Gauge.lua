@@ -56,7 +56,7 @@ end
 function Instance:Draw()
   base.Draw(self)
   if self.value > 0 and self.effect then
-	  self.effect(self)
+    self.effect(self)
   end
 end
 
