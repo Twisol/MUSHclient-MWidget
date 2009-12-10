@@ -3,7 +3,7 @@ local base = require("MWidget.Window")
 local Instance = {
   __index = base.__index,
   
-  Draw = nil,
+  Repaint = nil,
   SetEffect = nil,
   Value = nil,
 }
@@ -21,7 +21,7 @@ function Gauge.effects.solid(color)
   return function(gauge)
     local right = gauge.width * gauge.value/100
     
-    WindowRectOp(gauge.name, 2, 0, 0, right, gauge.height, color)
+    gauge:WindowRectOp(2, 0, 0, right, gauge.height, color)
   end
 end
 
@@ -29,7 +29,7 @@ function Gauge.effects.scaledgrad(leftcolor, rightcolor)
   return function(gauge)
     local right = gauge.width * gauge.value/100
     
-    WindowGradient(gauge.name, 0, 0, right, gauge.height, leftcolor, rightcolor, 1)
+    gauge:DrawGradient(0, 0, right, gauge.height, leftcolor, rightcolor, 1)
   end
 end
 
@@ -37,8 +37,8 @@ function Gauge.effects.meter(leftcolor, rightcolor)
   return function(gauge)
     local val_pixel = gauge.width * gauge.value/100
     
-    WindowRectOp(gauge.name, 2, 0, 0, val_pixel-1, gauge.height, leftcolor)
-    WindowRectOp(gauge.name, 2, val_pixel+1, 0, gauge.width, gauge.height, rightcolor)
+    gauge:WindowRectOp(2, 0, 0, val_pixel-1, gauge.height, leftcolor)
+    gauge:WindowRectOp(2, val_pixel+1, 0, gauge.width, gauge.height, rightcolor)
   end
 end
 
@@ -53,8 +53,8 @@ function Gauge.new(width, height)
   return o
 end
 
-function Instance:Draw()
-  base.Draw(self)
+function Instance:Repaint()
+  base.Repaint(self)
   if self.value > 0 and self.effect then
     self.effect(self)
   end

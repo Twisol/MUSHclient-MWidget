@@ -9,7 +9,7 @@ local Instance = {
   DrawCell = nil,
   Font = nil,
   Resize = nil,
-  Draw = nil,
+  Repaint = nil,
 }
 setmetatable(Instance, Instance)
 
@@ -88,8 +88,8 @@ function Instance:DrawCell(x, y)
     return nil, "Invalid cell index."
   end
   
-  WindowRectOp(self.name, 2, left, top, right, bottom, cell.backcolor)
-  WindowText(self.name, "f", cell.char, left, top, 0, 0, cell.forecolor, false)
+  self:WindowRectOp(2, left, top, right, bottom, cell.backcolor)
+  self:DrawText("f", cell.char, left, top, 0, 0, cell.forecolor)
   
   return true
 end
@@ -98,8 +98,8 @@ function Instance:Font(...)
   -- Only needs one font, so don't confuse users with ids.
   local ok, err = base.Font(self, "f", ...)
   if ok then
-    self.fonts["f"].width = WindowTextWidth(self.name, "f", "#")
-    self.fonts["f"].height = WindowFontInfo(self.name, "f",  1)
+    self.fonts["f"].width = self:TextWidth("f", "#")
+    self.fonts["f"].height = self:FontInfo("f",  1)
     
     self.width = self.fonts["f"].width * self.columns;
     self.height = self.fonts["f"].height * self.rows;
@@ -132,8 +132,8 @@ function Instance:Resize(columns, rows)
   return true
 end
 
-function Instance:Draw()
-  base.Draw(self)
+function Instance:Repaint()
+  base.Repaint(self)
   
   for y = 1, math.min(#self.grid, self.rows) do
     local row = self.grid[y]
