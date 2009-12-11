@@ -88,7 +88,12 @@ function Instance:DrawCell(x, y)
     return nil, "Invalid cell index."
   end
   
-  self:WindowRectOp(2, left, top, right, bottom, cell.backcolor)
+  self:DrawRectangle(left, top, right, bottom,
+     {color = cell.backcolor,
+      style = 0,
+      width = 1},
+     {color = cell.backcolor,
+      style = 0})
   self:DrawText("f", cell.char, left, top, 0, 0, cell.forecolor)
   
   return true

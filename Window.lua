@@ -4,30 +4,81 @@ MWidget = MWidget or {}
 --- A running count of the number of windows created by MWidget.
 -- It is used to ensure that window names are unique.
 local num_windows = 0
+
 --- A list of all MWidget-owned windows.
--- 
+-- It is used to resolve hotspot events to the proper handlers.
 local windows = setmetatable({}, {__mode = "v"})
 
 --- The methods shared by all Window instances.
 local Instance = {
+  -- General window functions
   Show = nil,
   Hide = nil,
   IsShown = nil,
   
-  Font = nil,
-  BackColor = nil,
+  Repaint = nil,
+  Clear = nil,
   
   Move = nil,
   Anchor = nil,
   
-  Repaint = nil,
-  Clear = nil,
-  
+  BackColor = nil,
   Destroy = nil,
   
+  WindowInfo = nil,
+  
+  
+  -- Hotspot-related functions
   AddHotspot = nil,
   DeleteHotspot = nil,
   DeleteAllHotspots = nil,
+  
+  HotspotTooltip = nil,
+  Menu = nil,
+  
+  HotspotInfo = nil,
+  
+  
+  -- Text/font functions
+  Font = nil,
+  TextWidth = nil,
+  
+  FontInfo = nil,
+  
+  
+  -- Graphics functions
+  GetPixel = nil,
+  SetPixel = nil,
+  
+  CreateImageFromBitmap = nil,
+  CreateImageFromWindow = nil,
+  CreateImageFromFile = nil,
+  CreateImageFromMemory = nil,
+  
+  BlendImage = nil,
+  DrawImage = nil,
+  DrawImageAlpha = nil,
+  MergeImageAlpha = nil,
+  
+  InvertRectangle = nil,
+  ApplyFilter = nil,
+  
+  DrawGradient = nil,
+  DrawLine = nil,
+  DrawLineList = nil,
+  DrawArc = nil,
+  DrawBezier = nil,
+  DrawPolygon = nil,
+  DrawEllipse = nil,
+  DrawRectangle = nil,
+  DrawRoundedRectangle = nil,
+  DrawChord = nil,
+  DrawPie = nil,
+  DrawText = nil,
+  
+  SaveAsImage = nil,
+  
+  ImageInfo = nil,
 }
 
 --- The base 'class' table for the Window widget type.
@@ -125,50 +176,16 @@ function Window.List()
 end
 
 
-function Instance:Clear(color)
-  WindowRectOp(self.name, 2, 0, 0, 0, 0, color or 0x000000)
-end
-
 function Instance:Show()
   WindowShow(self.name, true)
-end
-
-function Instance:IsShown()
-  return WindowInfo(self.name, 5)
 end
 
 function Instance:Hide()
   WindowShow(self.name, false)
 end
 
-function Instance:WindowInfo(infotype)
-  return WindowInfo(self.name, infotype)
-end
-
-function Instance:Move(x, y)
-  if self.position == nil then
-    self.position = {}
-  end
-  
-  self.position.x = x
-  self.position.y = y
-  self.position.anchor = -1
-  self.position.absolute = true
-end
-
-function Instance:Anchor(anchor)
-  if self.position == nil then
-    self.position = {}
-  end
-  
-  self.position.x = -1
-  self.position.y = -1
-  self.position.anchor = anchor
-  self.position.absolute = false
-end
-
-function Instance:BackColor(color)
-  self.backcolor = color or 0x000000
+function Instance:IsShown()
+  return WindowInfo(self.name, 5)
 end
 
 function Instance:Repaint()
@@ -201,40 +218,44 @@ function Instance:Repaint()
   end
 end
 
+function Instance:Clear(color)
+  WindowRectOp(self.name, 2, 0, 0, 0, 0, color or 0x000000)
+end
+
+function Instance:Move(x, y)
+  if self.position == nil then
+    self.position = {}
+  end
+  
+  self.position.x = x
+  self.position.y = y
+  self.position.anchor = -1
+  self.position.absolute = true
+end
+
+function Instance:Anchor(anchor)
+  if self.position == nil then
+    self.position = {}
+  end
+  
+  self.position.x = -1
+  self.position.y = -1
+  self.position.anchor = anchor
+  self.position.absolute = false
+end
+
+function Instance:BackColor(color)
+  self.backcolor = color or 0x000000
+end
+
 function Instance:Destroy()
   WindowDelete(self.name)
 end
 
-function Instance:Font(font_id, name, size, info_tbl)
-  local ok
-  if info_tbl then
-    ok = WindowFont(self.name, font_id, name, size,
-       info_tbl.bold, info_tbl.italic, info_tbl.underline, info_tbl.strikeout,
-       info_tbl.charset or 1, info_tbl.pitchandfamily or 0)
-  else
-    ok = WindowFont(self.name, font_id, name, size, false, false, false, false, 1, 0)
-  end
-  
-  if ok == error_code.eNoSuchWindow then
-    return nil, "no such window"
-  elseif ok == error_code.eCannotAddFont then
-    return nil, "unable to add font"
-  else
-    self.fonts[font_id] = {
-      name = name,
-      size = size,
-    }
-    return true
-  end
+function Instance:WindowInfo(infotype)
+  return WindowInfo(self.name, infotype)
 end
 
-function Instance:FontInfo(font_id, infotype)
-  return WindowFontInfo(self.name, font_id, infotype)
-end
-
-function Instance:TextWidth(font_id, text, unicode)
-  return WindowTextWidth(self.name, font_id, text, unicode or false)
-end
 
 function Instance:AddHotspot(id, left, top, right, bottom, cursor)
   local hotspot = self.hotspots[id]
@@ -273,10 +294,6 @@ function Instance:AddHotspot(id, left, top, right, bottom, cursor)
   return hotspot
 end
 
-function Instance:HotspotTooltip(id, text)
-  return WindowHotspotTooltip(self.name, id, text)
-end
-
 function Instance:DeleteHotspot(id)
   self.hotspots[name] = nil
   return WindowDeleteHotspot(self.name, id)
@@ -286,8 +303,44 @@ function Instance:DeleteAllHotspots()
   return WindowDeleteAllHotspots(self.name)
 end
 
+function Instance:HotspotTooltip(id, text)
+  return WindowHotspotTooltip(self.name, id, text)
+end
+
 function Instance:Menu(x, y, menu)
   return WindowMenu(self.name, x, y, menu)
+end
+
+
+function Instance:Font(font_id, name, size, info_tbl)
+  local ok
+  if info_tbl then
+    ok = WindowFont(self.name, font_id, name, size,
+       info_tbl.bold, info_tbl.italic, info_tbl.underline, info_tbl.strikeout,
+       info_tbl.charset or 1, info_tbl.pitchandfamily or 0)
+  else
+    ok = WindowFont(self.name, font_id, name, size, false, false, false, false, 1, 0)
+  end
+  
+  if ok == error_code.eNoSuchWindow then
+    return nil, "no such window"
+  elseif ok == error_code.eCannotAddFont then
+    return nil, "unable to add font"
+  else
+    self.fonts[font_id] = {
+      name = name,
+      size = size,
+    }
+    return true
+  end
+end
+
+function Instance:TextWidth(font_id, text, unicode)
+  return WindowTextWidth(self.name, font_id, text, unicode or false)
+end
+
+function Instance:FontInfo(font_id, infotype)
+  return WindowFontInfo(self.name, font_id, infotype)
 end
 
 
@@ -351,21 +404,28 @@ function Instance:MergeImageAlpha(img_id, mask_id, dest_rect, src_rect, mode, op
      src_rect.left, src_rect.top, src_rect.right, src_rect.bottom)
 end
 
-function Instance:ImageInfo(id, infotype)
-  return WindowImageInfo(self.name, id, infotype)
+function Instance:InvertRectangle(left, top, right, bottom)
+  return WindowRectOp(self.name, 3, left, top, right, bottom)
 end
 
-function Instance:DrawFilter(left, top, right, bottom, operation, options)
+function Instance:ApplyFilter(left, top, right, bottom, operation, options)
   return WindowFilter(self.name, left, top, right, bottom, operation, options)
 end
 
-function Instance:InvertRectangle(left, top, right, bottom)
-  return WindowRectOp(self.name, 3, left, top, right, bottom)
+function Instance:DrawGradient(left, top, right, bottom, start_color, end_color, mode)
+  return WindowGradient(self.name, left, top, right, bottom, start_color, end_color, mode)
 end
 
 function Instance:DrawLine(x1, y1, x2, y2, pen)
   return WindowLine(self.name, x1, y1, x2, y2,
      pen.color, pen.style, pen.width)
+end
+
+function Instance:DrawLineList(points, pen, brush, winding)
+  return WindowPolygon(self.name, points,
+     pen.color, pen.style, pen.width,
+     brush.color, brush,style,
+     false, winding or false)
 end
 
 function Instance:DrawArc(left, top, right, bottom, x1, y1, x2, y2, pen)
@@ -377,13 +437,6 @@ function Instance:DrawBezier(points, pen)
   return WindowBezier(self.name, points, pen.color, pen.style, pen.width)
 end
 
-function Instance:DrawLineList(points, pen, brush, winding)
-  return WindowPolygon(self.name, points,
-     pen.color, pen.style, pen.width,
-     brush.color, brush,style,
-     false, winding or false)
-end
-
 function Instance:DrawPolygon(points, pen, brush, winding)
   return WindowPolygon(self.name, points,
      pen.color, pen.style, pen.width,
@@ -391,46 +444,42 @@ function Instance:DrawPolygon(points, pen, brush, winding)
      true, winding or false)
 end
 
-function Instance:DrawGradient(left, top, right, bottom, start_color, end_color, mode)
-  return WindowGradient(self.name, left, top, right, bottom, start_color, end_color, mode)
+function Instance:DrawEllipse(left, top, right, bottom, pen, brush, image)
+  if image then
+    return WindowImageOp(self.name, 1, left, top, right, bottom,
+       pen.color, pen.style, pen.width,
+       brush.color, image)
+  else
+    WindowCircleOp(self.name, 1, left, top, right, bottom,
+       pen.color, pen.style, pen.width,
+       brush.color, brush.style)
+  end
 end
 
-function Instance:DrawEllipse(left, top, right, bottom, pen, brush)
-  return WindowCircleOp(self.name, 1, left, top, right, bottom,
-     pen.color, pen.style, pen.width,
-     brush.color, brush.style)
+function Instance:DrawRectangle(left, top, right, bottom, pen, brush, image)
+  if image then
+    return WindowImageOp(self.name, 2, left, top, right, bottom,
+       pen.color, pen.style, pen.width,
+       brush.color, image)
+  else
+    return WindowCircleOp(self.name, 2, left, top, right, bottom,
+       pen.color, pen.style, pen.width,
+       brush.color, brush.style)
+  end
 end
 
-function Instance:DrawEllipseImage(left, top, right, bottom, pen, brush, image)
-  return WindowImageOp(self.name, 1, left, top, right, bottom,
-     pen.color, pen.style, pen.width,
-     brush.color, image)
-end
-
-function Instance:DrawRectangle(left, top, right, bottom, pen, brush)
-  return WindowCircleOp(self.name, 2, left, top, right, bottom,
-     pen.color, pen.style, pen.width,
-     brush.color, brush.style)
-end
-
-function Instance:DrawRectangleImage(left, top, right, bottom, pen, brush, image)
-  return WindowImageOp(self.name, 2, left, top, right, bottom,
-     pen.color, pen.style, pen.width,
-     brush.color, image)
-end
-
-function Instance:DrawRoundedRectangle(left, top, right, bottom, width, height, pen, brush)
-  return WindowCircleOp(self.name, 3, left, top, right, bottom,
-     pen.color, pen.style, pen.width,
-     brush.color, brush.style,
-     width, height)
-end
-
-function Instance:DrawRoundedRectangleImage(left, top, right, bottom, width, height, pen, brush, image)
-  return WindowImageOp(self.name, 2, left, top, right, bottom,
-     pen.color, pen.style, pen.width,
-     brush.color, image,
-     width, height)
+function Instance:DrawRoundedRectangle(left, top, right, bottom, width, height, pen, brush, image)
+  if image then
+    return WindowImageOp(self.name, 2, left, top, right, bottom,
+       pen.color, pen.style, pen.width,
+       brush.color, image,
+       width, height)
+  else
+    return WindowCircleOp(self.name, 3, left, top, right, bottom,
+       pen.color, pen.style, pen.width,
+       brush.color, brush.style,
+       width, height)
+  end
 end
 
 function Instance:DrawChord(left, top, right, bottom, chord_x1, chord_y1, chord_x2, chord_y2, pen, brush)
@@ -453,15 +502,20 @@ function Instance:DrawText(font_id, text, left, top, right, bottom, color, unico
      color, unicode or false)
 end
 
+function Instance:SaveAsImage(filename)
+  return WindowWrite(self.name, filename)
+end
+
+function Instance:ImageInfo(id, infotype)
+  return WindowImageInfo(self.name, id, infotype)
+end
+
 -- raw interface to WindowRectOp
 -- Needs to be removed/renamed and split/merged into the rest of the API
 function Instance:WindowRectOp(action, left, top, right, bottom, color1, color2)
   return WindowRectOp(self.name, action, left, top, right, bottom, color1, color2)
 end
 
-function Instance:SaveAsImage(filename)
-  return WindowWrite(self.name, filename)
-end
 
 MWidget.Window = Window
 return Window
