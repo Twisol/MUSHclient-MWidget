@@ -63,7 +63,6 @@ function Instance:ResetGrid()
       
       row[#row+1] = {
         char = " ",
-        backcolor = self.backcolor,
         forecolor = 0xFFFFFF,
         hotspot = self:AddHotspot("(" .. x .. "," .. y .. ")",
                left, top,
@@ -88,13 +87,18 @@ function Instance:DrawCell(x, y)
     return nil, "Invalid cell index."
   end
   
-  self:DrawRectangle(left, top, right, bottom,
-     {color = cell.backcolor,
-      style = 0,
-      width = 1},
-     {color = cell.backcolor,
-      style = 0})
-  self:DrawText("f", cell.char, left, top, 0, 0, cell.forecolor)
+  if cell.backcolor then
+    self:DrawRectangle(left, top, right, bottom,
+       {color = cell.backcolor,
+        style = 0,
+        width = 1},
+       {color = cell.backcolor,
+        style = 0})
+  end
+  
+  if cell.char then
+    self:DrawText("f", cell.char, left, top, 0, 0, cell.forecolor)
+  end
   
   return true
 end
