@@ -470,7 +470,7 @@ end
 
 function Instance:DrawRoundedRectangle(left, top, right, bottom, width, height, pen, brush, image)
   if image then
-    return WindowImageOp(self.name, 2, left, top, right, bottom,
+    return WindowImageOp(self.name, 3, left, top, right, bottom,
        pen.color, pen.style, pen.width,
        brush.color, image,
        width, height)
