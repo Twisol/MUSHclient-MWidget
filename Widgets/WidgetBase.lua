@@ -9,7 +9,7 @@ local num_windows = 0
 -- It is used to resolve hotspot events to the proper handlers.
 local windows = setmetatable({}, {__mode = "v"})
 
---- The methods shared by all Window instances.
+--- The methods shared by all WidgetBase instances.
 local Instance = {
   -- General window functions
   Show = nil,
@@ -81,8 +81,8 @@ local Instance = {
   ImageInfo = nil,
 }
 
---- The base 'class' table for the Window widget type.
-local Window = {
+--- The base 'class' table for the WidgetBase widget type.
+local WidgetBase = {
   __index = Instance,
   
   hotspot_handlers = nil,
@@ -90,7 +90,7 @@ local Window = {
   new = nil,
   List = nil,
 }
-setmetatable(Window, Window)
+setmetatable(WidgetBase, WidgetBase)
 
 --- Resolves hotspot identifiers and executes the appropriate handler.
 -- @param flags The flags to pass to the handler.
@@ -147,11 +147,11 @@ local hotspot_handlers = {
     return execute_handler(flags, id, "dragrelease")
   end
 }
-Window.hotspot_handlers = hotspot_handlers
+WidgetBase.hotspot_handlers = hotspot_handlers
 
 
-function Window.new(width, height)
-  local o = setmetatable({}, Window)
+function WidgetBase.new(width, height)
+  local o = setmetatable({}, WidgetBase)
   num_windows = num_windows + 1
   
   o.name = "w" .. num_windows .. "_" .. GetPluginID()
@@ -165,13 +165,13 @@ function Window.new(width, height)
   o:Move(0, 0)
   
   -- Dummy window.
-  WindowCreate(o.name, 0, 0, 0, 0, 0, 0, 0)
+  WindowCreate(o.name, 0, 0, 1, 1, 0, 0, 0)
   
   windows[o.name] = o
   return o
 end
 
-function Window.List()
+function WidgetBase.List()
   return WindowList()
 end
 
@@ -191,35 +191,29 @@ end
 function Instance:Repaint()
   local flags = (self.position.absolute and 2 or 0)
   
+  local shown = WindowInfo(self.name, 5)
+  
   -- Recreate the window if it's been resized or re-anchored.
   if self.width ~= WindowInfo(self.name, 3) or
      self.height ~= WindowInfo(self.name, 4) or
-     self.position.anchor ~= WindowInfo(self.name, 7) then
-    local shown = WindowInfo(self.name, 5)
+     self.position.anchor ~= WindowInfo(self.name, 7) or
+     self.backcolor ~= WindowInfo(self.name, 9) then
     WindowCreate(self.name, self.position.x, self.position.y,
       self.width, self.height, self.position.anchor, flags, self.backcolor)
       
     for k,v in pairs(self.hotspots) do
       self:AddHotspot(k, v.left, v.top, v.right, v.bottom, v.cursor)
     end
-    
-    if shown then
-      self:Show()
-    else
-      self:Hide()
-    end
   else
-    WindowRectOp(self.name, 2, 0, 0, self.width, self.height, self.backcolor)
+    WindowRectOp(self.name, 2, 0, 0, 0, 0, self.backcolor)
     WindowPosition(self.name, self.position.x, self.position.y, self.position.anchor, flags)
   end
   
-  if show then
-    WindowShow(self.name, true)
-  end
+  WindowShow(self.name, shown)
 end
 
-function Instance:Clear(color)
-  WindowRectOp(self.name, 2, 0, 0, 0, 0, color or 0x000000)
+function Instance:Clear()
+  WindowRectOp(self.name, 2, 0, 0, 0, 0, self.backcolor)
 end
 
 function Instance:Move(x, y)
@@ -279,15 +273,15 @@ function Instance:AddHotspot(id, left, top, right, bottom, cursor)
   end
   
   WindowAddHotspot(self.name, self.name .. "-h" .. id, left, top, right, bottom,
-     "MWidget.Window.hotspot_handlers.mouseover",
-     "MWidget.Window.hotspot_handlers.cancelmouseover",
-     "MWidget.Window.hotspot_handlers.mousedown",
-     "MWidget.Window.hotspot_handlers.cancelmousedown",
-     "MWidget.Window.hotspot_handlers.mouseup",
+     "MWidget.WidgetBase.hotspot_handlers.mouseover",
+     "MWidget.WidgetBase.hotspot_handlers.cancelmouseover",
+     "MWidget.WidgetBase.hotspot_handlers.mousedown",
+     "MWidget.WidgetBase.hotspot_handlers.cancelmousedown",
+     "MWidget.WidgetBase.hotspot_handlers.mouseup",
      nil, cursor or 0, 0)
   WindowDragHandler(self.name, self.name .. "-h" .. id,
-     "MWidget.Window.hotspot_handlers.dragmove",
-     "MWidget.Window.hotspot_handlers.dragrelease",
+     "MWidget.WidgetBase.hotspot_handlers.dragmove",
+     "MWidget.WidgetBase.hotspot_handlers.dragrelease",
      0)
   
   self.hotspots[id] = hotspot
@@ -365,7 +359,14 @@ function Instance:CreateImageFromBitmap(img_id, bitmap)
 end
 
 function Instance:CreateImageFromWindow(img_id, window)
-  return WindowImageFromWindow(self.name, img_id, window)
+  local name
+  if type(window) == "table" then
+    name = window.name
+  else
+    name = window
+  end
+  
+  return WindowImageFromWindow(self.name, img_id, name)
 end
 
 function Instance:CreateImageFromFile(img_id, filename)
@@ -378,30 +379,30 @@ end
 
 function Instance:BlendImage(img_id, dest_rect, src_rect, mode, opacity)
   return WindowBlendImage(self.name, img_id,
-     dest_rect.left, dest_rect.top, dest_rect.right, dest_rect.bottom,
+     dest_rect[1], dest_rect[2], dest_rect[3], dest_rect[4],
      mode, opacity,
-     src_rect.left, src_rect.top, src_rect.right, src_rect.bottom)
+     src_rect[1], src_rect[2], src_rect[3], src_rect[4])
 end
 
 function Instance:DrawImage(img_id, dest_rect, src_rect, mode)
-  return WindowDrawImageAlpha(self.name, img_id,
-     dest_rect.left, dest_rect.top, dest_rect.right, dest_rect.bottom,
+  return WindowDrawImage(self.name, img_id,
+     dest_rect[1], dest_rect[2], dest_rect[3], dest_rect[4],
      mode,
-     src_rect.left, src_rect.top, src_rect.right, src_rect.bottom)
+     src_rect[1], src_rect[2], src_rect[3], src_rect[4])
 end
 
 function Instance:DrawImageAlpha(img_id, dest_rect, src_x, src_y, opacity)
   return WindowDrawImageAlpha(self.name, img_id,
-     dest_rect.left, dest_rect.top, dest_rect.right, dest_rect.bottom,
+     dest_rect[1], dest_rect[2], dest_rect[3], dest_rect[4],
      opacity,
      src_x, src_y)
 end
 
 function Instance:MergeImageAlpha(img_id, mask_id, dest_rect, src_rect, mode, opacity)
   return WindowMergeImageAlpha(self.name, img_id, mask_id,
-     dest_rect.left, dest_rect.top, dest_rect.right, dest_rect.bottom,
+     dest_rect[1], dest_rect[2], dest_rect[3], dest_rect[4],
      mode, opacity,
-     src_rect.left, src_rect.top, src_rect.right, src_rect.bottom)
+     src_rect[1], src_rect[2], src_rect[3], src_rect[4])
 end
 
 function Instance:InvertRectangle(left, top, right, bottom)
@@ -517,5 +518,5 @@ function Instance:WindowRectOp(action, left, top, right, bottom, color1, color2)
 end
 
 
-MWidget.Window = Window
-return Window
+MWidget.WidgetBase = WidgetBase
+return WidgetBase
