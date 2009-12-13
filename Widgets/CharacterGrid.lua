@@ -1,4 +1,4 @@
-local base = require("MWidget.Window")
+local base = require("MWidget.Widgets.WidgetBase")
 
 local Instance = {
   __index = base.__index,
