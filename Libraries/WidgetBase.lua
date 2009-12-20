@@ -22,9 +22,9 @@ setmetatable(WidgetBase, WidgetBase)
 function WidgetBase.new(width, height)
   o = setmetatable({}, WidgetBase)
   
-  o.width = width
-  o.height = height
-  o.canvas = Canvas.new(width, height)
+  o.width = width or 1
+  o.height = height or 1
+  o.canvas = Canvas.new(o.width, o.height)
   o.invalidated = true
   
   o.children = {}

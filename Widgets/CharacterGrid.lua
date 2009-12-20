@@ -1,7 +1,10 @@
-local base = require("MWidget.Libraries.Canvas")
+local base = require("MWidget.Libraries.WidgetBase")
+local Hotspot = require("MWidget.Libraries.Hotspot")
 
 local Instance = {
   __index = base.__index,
+  
+  OnPaint = nil,
   
   HotspotToCell = nil,
   DrawCell = nil,
@@ -17,7 +20,6 @@ local CharacterGrid = {
 }
 setmetatable(CharacterGrid, CharacterGrid)
 
-
 function CharacterGrid.new(columns, rows)
   local o = base.new()
   setmetatable(o, CharacterGrid)
@@ -26,51 +28,79 @@ function CharacterGrid.new(columns, rows)
   o.rows = rows
   
   o:Font(GetInfo(20), 10)
+  o:Resize(columns, rows)
   
   return o
 end
 
-function Instance:HotspotToCell(hotspot_id)
-  local _, _, x, y = string.find(hotspot_id, "%((%d+),(%d+)%)")
-  
-  return tonumber(x), tonumber(y)
-end
 
-function Instance:DrawCell(x, y, char, forecolor, backcolor)
-  if x > self.columns or y > self.rows then
-    return nil, "Invalid cell index."
-  end
-  
+local DrawCell = function(self, cell, x, y)
   -- Index into the appropriate cell
-  local left = self.fonts["f"].width*(x-1)
-  local top = self.fonts["f"].height*(y-1)
-  local right = left+self.fonts["f"].width
-  local bottom = top+self.fonts["f"].height
+  local left = self.font.width*(x-1)
+  local top = self.font.height*(y-1)
+  local right = left+self.font.width
+  local bottom = top+self.font.height
   
-  self:DrawRectangle(left, top, right, bottom,
-     {color = backcolor or self.backcolor,
+  self.canvas:DrawRectangle(left, top, right, bottom,
+     {color = cell.backcolor or self.canvas.backcolor,
       style = 0,
       width = 1},
-     {color = backcolor or self.backcolor,
+     {color = cell.backcolor or self.canvas.backcolor,
       style = 0})
   
-  if char then
-    self:DrawText("f", char, left, top, 0, 0, forecolor)
-  end
+  self.canvas:DrawText("f", cell.char, left, top, 0, 0, cell.forecolor)
   
   return true
 end
 
-function Instance:Font(...)
-  -- Only needs one font, so don't confuse users with ids.
-  local ok, err = base.Font(self, "f", ...)
-  if ok then
-    self.fonts["f"].width = self:TextWidth("f", "#")
-    self.fonts["f"].height = self:FontInfo("f",  1)
-    
-    self:Resize(self.columns, self.rows)
+function Instance:Cell(x, y)
+  if x > self.columns or y > self.rows then
+    return nil, "Invalid cell index."
   end
-  return ok, err
+  
+  return self.grid[y][x]
+end
+
+function Instance:HotspotToCell(hotspot)
+  local _, _, x, y = string.find(hotspot.name, "%((%d+),(%d+)%)")
+  x, y = tonumber(x), tonumber(y)
+  
+  return self:Cell(x, y), x, y
+end
+
+function Instance:Font(name, size)
+  -- Only needs one font, so don't confuse users with ids.
+  self.font = assert(self.canvas:Font("f", name, size))
+  
+  -- Record some extra information for later.
+  self.font.width = self.canvas:TextWidth("f", "#")
+  self.font.height = self.canvas:FontInfo("f",  1)
+  self.width = self.font.width * self.columns
+  self.height = self.font.height * self.rows
+  
+  self:Invalidate()
+  self.canvas:Resize(self.width, self.height)
+end
+
+function Instance:ResetGrid()
+  local grid = {}
+  
+  for y = 1, self.rows do
+    local row = {}
+    for x = 1, self.columns do
+      local left = self.font.width*(x-1)
+      local top = self.font.height*(y-1)
+      
+      row[#row+1] = {
+        char = " ",
+        forecolor = 0xFFFFFF,
+        hotspot = Hotspot.new("(" .. x .. "," .. y .. ")")
+      }
+    end
+    grid[#grid+1] = row
+  end
+ 
+  self.grid = grid
 end
 
 function Instance:Resize(columns, rows)
@@ -80,8 +110,23 @@ function Instance:Resize(columns, rows)
   
   self.columns = columns
   self.rows = rows
+  self.width = self.font.width * self.columns
+  self.height = self.font.height * self.rows
   
-  return base.Resize(self, self.fonts["f"].width * self.columns, self.fonts["f"].height * self.rows)
+  -- Start with a blank slate
+  self:ResetGrid()
+  
+  self:Invalidate()
+  return self.canvas:Resize(self.width, self.height)
+end
+
+function Instance:OnPaint()
+  self.canvas:Clear()
+  for y = 1, self.rows do
+    for x = 1, self.columns do
+      DrawCell(self, self:Cell(x,y), x, y)
+    end
+  end
 end
 
 MWidget.CharacterGrid = CharacterGrid

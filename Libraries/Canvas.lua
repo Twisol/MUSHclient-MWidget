@@ -115,7 +115,7 @@ function Methods:Font(font_id, name, size, info_tbl)
       name = name,
       size = size,
     }
-    return true
+    return self.fonts[font_id]
   end
 end
 
@@ -184,7 +184,7 @@ end
 function Methods:DrawImage(img_id, dest_rect, src_rect, mode)
   return WindowDrawImage(self.name, img_id,
      dest_rect[1], dest_rect[2], dest_rect[3], dest_rect[4],
-     mode,
+     mode or 1,
      src_rect[1], src_rect[2], src_rect[3], src_rect[4])
 end
 
@@ -312,6 +312,13 @@ end
 -- Needs to be removed/renamed and split/merged into the rest of the API
 function Methods:WindowRectOp(action, left, top, right, bottom, color1, color2)
   return WindowRectOp(self.name, action, left, top, right, bottom, color1, color2)
+end
+
+-- Ease-of-use function that wraps the process of deriving an image from a window and drawing it.
+function Methods:BlitCanvas(canvas, x, y)
+  self:ImageFromWindow("blitcanvas", canvas)
+  self:DrawImage("blitcanvas", {x, y}, {}, 1)
+  self:DeleteImage("blitcanvas")
 end
 
 MWidget.Canvas = Canvas

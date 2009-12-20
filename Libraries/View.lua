@@ -22,6 +22,7 @@ local View = {
   
   new = nil,
   List = nil,
+  FromName = nil,
 }
 setmetatable(View, View)
 
@@ -37,6 +38,7 @@ function View.new(child, x, y)
   
   o.position = {}
   
+  o:Move(o.x, o.y)
   o:Refresh(false)
   
   MWidget.RegisterWindow(o.name, o)
@@ -44,7 +46,11 @@ function View.new(child, x, y)
 end
 
 function View.List()
-  return WindowList()
+  return WindowList() or {}
+end
+
+function View.FromName(name)
+  return MWidget.GetWindowByName(name)
 end
 
 
@@ -67,7 +73,7 @@ function Instance:Refresh(show)
   -- TODO:
   -- * Recreate window if the final canvas has been resized, or
   --   if the view has been re-anchored.
-  check(WindowCreate(self.name, self.x, self.y, self.width, self.height, 0, 2, 0x000000))
+  check(WindowCreate(self.name, self.position.x, self.position.y, self.width, self.height, 0, 2, 0x000000))
   
   -- * Draw final canvas to screen.
   check(WindowImageFromWindow(self.name, "view", self.child.canvas.name))
