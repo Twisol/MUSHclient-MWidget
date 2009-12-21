@@ -1,4 +1,8 @@
-local MWidget = require("MWidget")
+require("MWidget")
+
+--- A running count of the number of canvases created so far.
+-- It is used to ensure that window names are unique.
+local num_canvases = 0
 
 local Methods = {
   -- General canvas functions
@@ -60,8 +64,9 @@ setmetatable(Canvas, Canvas)
 
 function Canvas.new(width, height)
   local o = setmetatable({}, Canvas)
+  num_canvases = num_canvases + 1
   
-  o.name = MWidget.GetUniqueName() .. "-canvas"
+  o.name = "w" .. num_canvases .. "_" .. GetPluginID()
   o.width = width or 1
   o.height = height or 1
   o.backcolor = 0x000000
@@ -149,12 +154,12 @@ function Methods:CreateImageFromBitmap(img_id, bitmap)
     tonumber(bitmap[1], 2))
 end
 
-function Methods:CreateImageFromWindow(img_id, window)
+function Methods:CreateImageFromWidget(img_id, widget)
   local name
-  if type(window) == "table" then
-    name = window.name
+  if type(widget) == "table" then
+    name = widget.canvas.name
   else
-    name = window
+    name = widget
   end
   
   return WindowImageFromWindow(self.name, img_id, name)
@@ -321,5 +326,4 @@ function Methods:BlitCanvas(canvas, x, y)
   self:DeleteImage("blitcanvas")
 end
 
-MWidget.Canvas = Canvas
 return Canvas

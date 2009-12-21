@@ -1,18 +1,28 @@
 local MWidget = require("MWidget")
+local Canvas = require("MWidget.Libraries.Canvas")
+
+--- A list of all MWidget-owned views.
+-- It is used to resolve hotspot events to the proper handlers.
+local views = {}
 
 --- The methods shared by all View instances.
 local Instance = {
-  -- General window functions
+  __index = Canvas,
+  
   Show = nil,
   Hide = nil,
   IsShown = nil,
   
   Move = nil,
   Anchor = nil,
+  Resize = nil,
   GetPosition = nil,
+  
+  GetChild = nil,
   
   Destroy = nil,
 }
+setmetatable(Instance, Instance)
 
 --- The base 'class' table for the View widget type.
 local View = {
@@ -27,30 +37,30 @@ local View = {
 setmetatable(View, View)
 
 function View.new(child, x, y)
-  local o = setmetatable({}, View)
+  local o = Canvas.new(child.width, child.height)
+  setmetatable(o, View)
   
-  o.name = MWidget.GetUniqueName()
-  o.x = x
-  o.y = y
-  o.width = child.width
-  o.height = child.height
   o.child = child
+  o.autosize = true
   
-  o.position = {}
+  o:Move(x, y)
+  o:Refresh()
+  o:Hide()
   
-  o:Move(o.x, o.y)
-  o:Refresh(false)
-  
-  MWidget.RegisterWindow(o.name, o)
+  views[o.name] = o
   return o
 end
 
 function View.List()
-  return WindowList() or {}
+  local list = {}
+  for k,v in pairs(views) do
+    list[k] = v
+  end
+  return list
 end
 
 function View.FromName(name)
-  return MWidget.GetWindowByName(name)
+  return views[name]
 end
 
 
@@ -66,101 +76,74 @@ function Instance:IsShown()
   return WindowInfo(self.name, 5)
 end
 
-function Instance:Refresh(show)
+function Instance:Refresh()
   -- * Recursively render child widgets to obtain a final canvas.
   self.child:InternalRender()
   
-  -- TODO:
-  -- * Recreate window if the final canvas has been resized, or
-  --   if the view has been re-anchored.
-  check(WindowCreate(self.name, self.position.x, self.position.y, self.width, self.height, 0, 2, 0x000000))
+  -- * Resize the window if necessary.
+  if self.autosize and
+     (self.width ~= self.child.width or
+      self.height ~= self.child.height) then
+    self:Resize(self.child.width, self.child.height)
+    self.autosize = true
+  end
   
   -- * Draw final canvas to screen.
-  check(WindowImageFromWindow(self.name, "view", self.child.canvas.name))
-  check(WindowDrawImage(self.name, "view", 0, 0, 0, 0, 1))
-  check(WindowLoadImage(self.name, "view", ""))
+  self:CreateImageFromWidget("view", self.child)
+  self:DrawImage("view", {0, 0, 0, 0}, {}, 2)
   
   -- * Show the view in order to refresh and display it.
-  if show ~= false then
-    check(WindowShow(self.name))
-  end
+  self:Show()
 end
 
 function Instance:Move(x, y)
-  self.position.x = x
-  self.position.y = y
-  self.position.anchor = -1
-  self.position.absolute = true
+  self.x = x
+  self.y = y
+  self.anchor = -1
+  
+  WindowPosition(self.name, x, y, -1, 2)
 end
 
 function Instance:Anchor(anchor)
-  self.position.x = -1
-  self.position.y = -1
-  self.position.anchor = anchor
-  self.position.absolute = false
+  self.x = -1
+  self.y = -1
+  self.anchor = anchor
+  
+  WindowPosition(self.name, -1, -1, anchor, 0)
+end
+
+function Instance:Resize(width, height, autosize)
+  self.width = width
+  self.height = height
+  self.autosize = false
+  
+  check(WindowCreate(self.name, self.x, self.y, self.width, self.height,
+     self.anchor, (self.anchor == -1) and 2 or 0, 0x000000))
+  self:DrawImage("view", {0, 0, 0, 0}, {}, 2)
+  self:Show()
+end
+
+function Instance:ResetSize()
+  self:Resize(self.child.width, self.child.height)
+  self.autosize = true
 end
 
 function Instance:GetPosition()
   if self.position.anchor == -1 then
-    return "absolute", self.position.x, self.position.y
+    return self.x, self.y, self.anchor
   else
-    return "anchored", WindowInfo(self.name, 10), WindowInfo(self.name, 11), self.position.anchor
+    return WindowInfo(self.name, 10), WindowInfo(self.name, 11), self.anchor
   end
+end
+
+function Instance:GetChild()
+  return self.child
 end
 
 function Instance:Destroy()
-  MWidget.UnregisterWindow(self.name)
-  WindowDelete(self.name)
+  Canvas.Destroy(self)
+  views[self.name] = nil
 end
-
---[[
-function Instance:AddHotspot(id, left, top, right, bottom, cursor)
-  local hotspot = self.hotspots[id]
-  
-  -- reuse table and handlers if possible
-  if hotspot then
-    hotspot.cursor = cursor
-    hotspot.left = left
-    hotspot.top = top
-    hotspot.right = right
-    hotspot.bottom = bottom
-  else
-    hotspot = {
-      id = id,
-      cursor = cursor,
-      left = left,
-      top = top,
-      right = right,
-      bottom = bottom,
-    }
-  end
-  
-  WindowAddHotspot(self.name, self.name .. "-h" .. id, left, top, right, bottom,
-     "MWidget.Core.hotspot_handlers.mouseover",
-     "MWidget.Core.hotspot_handlers.cancelmouseover",
-     "MWidget.Core.hotspot_handlers.mousedown",
-     "MWidget.Core.hotspot_handlers.cancelmousedown",
-     "MWidget.Core.hotspot_handlers.mouseup",
-     nil, cursor or 0, 0)
-  WindowDragHandler(self.name, self.name .. "-h" .. id,
-     "MWidget.Core.hotspot_handlers.dragmove",
-     "MWidget.Core.hotspot_handlers.dragrelease",
-     0)
-  
-  self.hotspots[id] = hotspot
-  return hotspot
-end
-
-function Instance:DeleteHotspot(id)
-  self.hotspots[name] = nil
-  return WindowDeleteHotspot(self.name, id)
-end
-
-function Instance:DeleteAllHotspots()
-  return WindowDeleteAllHotspots(self.name)
-end
---]]
-
 
 -- TODO: may need to use > for right/bottom instead of >=
 local function find_hotspot(widget, handler_type, x, y)
@@ -200,7 +183,7 @@ end
 local execute_handler = function(flags, name, handler_type)
   -- * Get view object from hotspot name
   local _, _, view_name, x, y = name:find("(w%d+_%w+)-h%((%d+),(%d+)%)")
-  local view = MWidget:GetWindowByName(view_name)
+  local view = views[view_name]
   x, y = tonumber(x), tonumber(y)
   
   -- * Recurse through child widgets until a hotspot with the right handler
