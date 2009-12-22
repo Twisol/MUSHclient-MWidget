@@ -36,12 +36,41 @@ local View = {
 }
 setmetatable(View, View)
 
+
+local function init_hotspots(self)
+  -- Takes around 2 seconds to execute this loop.
+  --
+  -- TODO: Hopefully, WindowAddHotspot will eventually add a
+  -- 'pixel-sensitive' flag so that only one hotspot would be
+  -- needed to cover the view. Unfortunately, that's not an
+  -- option at this time.
+  for y = 0, self.height do
+    for x = 0, self.width do
+      local id = self.name .. "-h(" .. x .. "," .. y .. ")"
+      check(WindowAddHotspot(self.name, id, x, y, x+1, y+1,
+         "MWidget.View.hotspot_handlers.mouseover",
+         "MWidget.View.hotspot_handlers.cancelmouseover",
+         "MWidget.View.hotspot_handlers.mousedown",
+         "MWidget.View.hotspot_handlers.cancelmousedown",
+         "MWidget.View.hotspot_handlers.mouseup",
+         nil, 0, 0))
+      check(WindowDragHandler(self.name, id,
+         "MWidget.View.hotspot_handlers.dragmove",
+         "MWidget.View.hotspot_handlers.dragrelease",
+         0))
+    end
+  end
+end
+
+
 function View.new(child, x, y)
   local o = Canvas.new(child.width, child.height)
   setmetatable(o, View)
   
   o.child = child
   o.autosize = true
+  
+  init_hotspots(o)
   
   o:Move(x, y)
   o:Refresh()
@@ -62,7 +91,6 @@ end
 function View.FromName(name)
   return views[name]
 end
-
 
 function Instance:Show()
   WindowShow(self.name, true)
@@ -119,6 +147,8 @@ function Instance:Resize(width, height, autosize)
   
   check(WindowCreate(self.name, self.x, self.y, self.width, self.height,
      self.anchor, (self.anchor == -1) and 2 or 0, 0x000000))
+  init_hotspots(self)
+  
   self:DrawImage("view", {0, 0, 0, 0}, {}, 2)
   self:Show()
 end
@@ -148,12 +178,12 @@ end
 -- TODO: may need to use > for right/bottom instead of >=
 local function find_hotspot(widget, handler_type, x, y)
   -- first look for matches in this widget
-  for _,record in ipairs(widget.hotspots) do
+  for _,hotspot in ipairs(widget.hotspots) do
     -- cull hotspots that don't contain the point
-    if record.left <= x and record.top <= y and
-       record.right >= x and record.bottom >= y and
-       record.hotspot.handlers[handler_type] ~= nil then
-      return widget, record.hotspot
+    if hotspot.left <= x and hotspot.top <= y and
+       hotspot.right >= x and hotspot.bottom >= y and
+       hotspot.handlers[handler_type] ~= nil then
+      return widget, hotspot
     end
   end
   
@@ -191,7 +221,9 @@ local execute_handler = function(flags, name, handler_type)
   local widget, hotspot = find_hotspot(view.child, handler_type, x, y)
   
   -- * Execute the handler.
-  return hotspot:ExecuteHandler(view, widget, handler_type, flags)
+  if hotspot then
+    return hotspot:ExecuteHandler(view, widget, handler_type, flags)
+  end
 end
 
 --- Base handlers that forward events through execute_handler()

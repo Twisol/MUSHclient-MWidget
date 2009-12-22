@@ -14,10 +14,15 @@ local Hotspot = {
 }
 setmetatable(Hotspot, Hotspot)
 
-function Hotspot.new(name)
+function Hotspot.new(name, left, top, right, bottom)
   local o = setmetatable({}, Hotspot)
   
   o.name = name
+  o.left = left
+  o.top = top
+  o.right = right
+  o.bottom = bottom
+  
   o.handlers = {}
   
   return o

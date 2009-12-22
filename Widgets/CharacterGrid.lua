@@ -1,5 +1,4 @@
 local base = require("MWidget.Libraries.WidgetBase")
-local Hotspot = require("MWidget.Libraries.Hotspot")
 
 local Instance = {
   __index = base.__index,
@@ -91,10 +90,13 @@ function Instance:ResetGrid()
       local left = self.font.width*(x-1)
       local top = self.font.height*(y-1)
       
+      local hotspot = self:AddHotspot("(" .. x .. "," .. y .. ")",
+         left, top, left + self.font.width, top + self.font.height)
+      
       row[#row+1] = {
         char = " ",
         forecolor = 0xFFFFFF,
-        hotspot = Hotspot.new("(" .. x .. "," .. y .. ")")
+        hotspot = hotspot,
       }
     end
     grid[#grid+1] = row

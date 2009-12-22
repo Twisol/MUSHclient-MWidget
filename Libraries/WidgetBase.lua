@@ -1,5 +1,6 @@
 local MWidget = require("MWidget")
 local Canvas = require("MWidget.Libraries.Canvas")
+local Hotspot = require("MWidget.Libraries.Hotspot")
 local View = require("MWidget.Libraries.View")
 
 local Instance = {
@@ -41,21 +42,26 @@ function Instance:AddChild(widget, x, y, name)
   })
 end
 
-function Instance:AddHotspot(hotspot, left, top, right, bottom)
-  local record = self.hotspots[hotspot.name]
+function Instance:AddHotspot(name, left, top, right, bottom)
+  local hotspot = self.hotspots[name]
   
-  if not record then
-    record = {
-      hotspot = hotspot,
-      left = left,
-      top = top,
-      right = right,
-      bottom = bottom,
-    }
-    table.insert(self.hotspots, record)
+  if not hotspot then
+    hotspot = Hotspot.new(name, left, top, right, bottom)
+    
+    table.insert(self.hotspots, hotspot)
+    self.hotspots[name] = hotspot
+  else
+    hotspot.left = left
+    hotspot.top = top
+    hotspot.right = right
+    hotspot.bottom = bottom
   end
   
-  self.hotspots[hotspot.name] = record
+  return hotspot
+end
+
+function Instance:GetHotspot(name)
+  return self.hotspots[name]
 end
 
 function Instance:Invalidate()
