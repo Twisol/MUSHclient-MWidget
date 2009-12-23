@@ -38,12 +38,26 @@ setmetatable(View, View)
 
 
 local function init_hotspots(self)
-  -- Takes around 2 seconds to execute this loop.
-  --
   -- TODO: Hopefully, WindowAddHotspot will eventually add a
   -- 'pixel-sensitive' flag so that only one hotspot would be
   -- needed to cover the view. Unfortunately, that's not an
   -- option at this time.
+  --
+  -- CONFIRMED IN 4.45
+  -- Replace the loops with the below commented code after the release of 4.45.
+  --
+  -- check(WindowAddHotspot(self.name, "abstraction_layer", 0, 0, 0, 0,
+  --    "MWidget.View.hotspot_handlers.mouseover",
+  --    "MWidget.View.hotspot_handlers.cancelmouseover",
+  --    "MWidget.View.hotspot_handlers.mousedown",
+  --    "MWidget.View.hotspot_handlers.cancelmousedown",
+  --    "MWidget.View.hotspot_handlers.mouseup",
+  --    nil, 0, 1))
+  -- check(WindowDragHandler(self.name, "abstraction_layer",
+  --    "MWidget.View.hotspot_handlers.dragmove",
+  --    "MWidget.View.hotspot_handlers.dragrelease",
+  --    0))
+  
   for y = 0, self.height do
     for x = 0, self.width do
       local id = self.name .. "-h(" .. x .. "," .. y .. ")"
@@ -72,7 +86,7 @@ function View.new(child, x, y)
   
   init_hotspots(o)
   
-  o:Move(x, y)
+  o:Move(x or 0, y or 0)
   o:Refresh()
   o:Hide()
   
@@ -106,7 +120,7 @@ end
 
 function Instance:Refresh()
   -- * Recursively render child widgets to obtain a final canvas.
-  self.child:InternalRender()
+  self.child:InternalRender(self.name)
   
   -- * Resize the window if necessary.
   if self.autosize and
@@ -175,13 +189,12 @@ function Instance:Destroy()
   views[self.name] = nil
 end
 
--- TODO: may need to use > for right/bottom instead of >=
 local function find_hotspot(widget, handler_type, x, y)
   -- first look for matches in this widget
   for _,hotspot in ipairs(widget.hotspots) do
     -- cull hotspots that don't contain the point
     if hotspot.left <= x and hotspot.top <= y and
-       hotspot.right >= x and hotspot.bottom >= y and
+       hotspot.right > x and hotspot.bottom > y and
        hotspot.handlers[handler_type] ~= nil then
       return widget, hotspot
     end
@@ -194,7 +207,7 @@ local function find_hotspot(widget, handler_type, x, y)
     local right, bottom = record.x + child.width, record.y + child.height
     
     -- cull widgets that don't contain the point
-    if left <= x and top <= y and right >= x and bottom >= y then
+    if left <= x and top <= y and right > x and bottom > y then
       local widget, hotspot = find_hotspot(record.widget, handler_type, x - left, y - top)
       if hotspot then
         return widget, hotspot
