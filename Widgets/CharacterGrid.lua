@@ -90,7 +90,7 @@ function Instance:ResetGrid()
       local left = self.font.width*(x-1)
       local top = self.font.height*(y-1)
       
-      local hotspot = self:AddHotspot("(" .. x .. "," .. y .. ")",
+      local hotspot = self:SetHotspot("(" .. x .. "," .. y .. ")",
          left, top, left + self.font.width, top + self.font.height)
       
       row[#row+1] = {

@@ -15,7 +15,6 @@ local Instance = {
   
   Move = nil,
   Anchor = nil,
-  Resize = nil,
   GetPosition = nil,
   
   GetChild = nil,
@@ -38,42 +37,17 @@ setmetatable(View, View)
 
 
 local function init_hotspots(self)
-  -- TODO: Hopefully, WindowAddHotspot will eventually add a
-  -- 'pixel-sensitive' flag so that only one hotspot would be
-  -- needed to cover the view. Unfortunately, that's not an
-  -- option at this time.
-  --
-  -- CONFIRMED IN 4.45
-  -- Replace the loops with the below commented code after the release of 4.45.
-  --
-  -- check(WindowAddHotspot(self.name, "abstraction_layer", 0, 0, 0, 0,
-  --    "MWidget.View.hotspot_handlers.mouseover",
-  --    "MWidget.View.hotspot_handlers.cancelmouseover",
-  --    "MWidget.View.hotspot_handlers.mousedown",
-  --    "MWidget.View.hotspot_handlers.cancelmousedown",
-  --    "MWidget.View.hotspot_handlers.mouseup",
-  --    nil, 0, 1))
-  -- check(WindowDragHandler(self.name, "abstraction_layer",
-  --    "MWidget.View.hotspot_handlers.dragmove",
-  --    "MWidget.View.hotspot_handlers.dragrelease",
-  --    0))
-  
-  for y = 0, self.height do
-    for x = 0, self.width do
-      local id = self.name .. "-h(" .. x .. "," .. y .. ")"
-      check(WindowAddHotspot(self.name, id, x, y, x+1, y+1,
-         "MWidget.View.hotspot_handlers.mouseover",
-         "MWidget.View.hotspot_handlers.cancelmouseover",
-         "MWidget.View.hotspot_handlers.mousedown",
-         "MWidget.View.hotspot_handlers.cancelmousedown",
-         "MWidget.View.hotspot_handlers.mouseup",
-         nil, 0, 0))
-      check(WindowDragHandler(self.name, id,
-         "MWidget.View.hotspot_handlers.dragmove",
-         "MWidget.View.hotspot_handlers.dragrelease",
-         0))
-    end
-  end
+  check(WindowAddHotspot(self.name, self.name, 0, 0, 0, 0,
+     "MWidget.View.hotspot_handlers.mouseover",
+     "MWidget.View.hotspot_handlers.cancelmouseover",
+     "MWidget.View.hotspot_handlers.mousedown",
+     "MWidget.View.hotspot_handlers.cancelmousedown",
+     "MWidget.View.hotspot_handlers.mouseup",
+     nil, 0, 1)) -- pixel-sensitive
+  check(WindowDragHandler(self.name, self.name,
+     "MWidget.View.hotspot_handlers.dragmove",
+     "MWidget.View.hotspot_handlers.dragrelease",
+     0))
 end
 
 
@@ -82,7 +56,6 @@ function View.new(child, x, y)
   setmetatable(o, View)
   
   o.child = child
-  o.autosize = true
   
   init_hotspots(o)
   
@@ -123,11 +96,9 @@ function Instance:Refresh()
   self.child:InternalRender(self.name)
   
   -- * Resize the window if necessary.
-  if self.autosize and
-     (self.width ~= self.child.width or
-      self.height ~= self.child.height) then
+  if self.width ~= self.child.width or
+     self.height ~= self.child.height then
     self:Resize(self.child.width, self.child.height)
-    self.autosize = true
   end
   
   -- * Draw final canvas to screen.
@@ -154,24 +125,6 @@ function Instance:Anchor(anchor)
   WindowPosition(self.name, -1, -1, anchor, 0)
 end
 
-function Instance:Resize(width, height, autosize)
-  self.width = width
-  self.height = height
-  self.autosize = false
-  
-  check(WindowCreate(self.name, self.x, self.y, self.width, self.height,
-     self.anchor, (self.anchor == -1) and 2 or 0, 0x000000))
-  init_hotspots(self)
-  
-  self:DrawImage("view", {0, 0, 0, 0}, {}, 2)
-  self:Show()
-end
-
-function Instance:ResetSize()
-  self:Resize(self.child.width, self.child.height)
-  self.autosize = true
-end
-
 function Instance:GetPosition()
   if self.position.anchor == -1 then
     return self.x, self.y, self.anchor
@@ -189,14 +142,34 @@ function Instance:Destroy()
   views[self.name] = nil
 end
 
-local function find_hotspot(widget, handler_type, x, y)
+
+local function new_mouse_event(view, x, y, flags)
+  return {
+    view = view,
+    
+    widget_x = x,
+    widget_y = y,
+    output_x = view.x + x,
+    output_y = view.y + y,
+    
+    shift_key = bit.band(flags, 0x01) ~= 0,
+    ctrl_key = bit.band(flags, 0x02) ~= 0,
+    alt_key = bit.band(flags, 0x04) ~= 0,
+    lh_mouse = bit.band(flags, 0x10) ~= 0,
+    rh_mouse = bit.band(flags, 0x20) ~= 0,
+    
+    -- possibly abstract into its own event
+    doubleclick = bit.band(flags, 0x40) ~= 0,
+  }
+end
+
+local function find_hotspot(widget, x, y)
   -- first look for matches in this widget
   for _,hotspot in ipairs(widget.hotspots) do
     -- cull hotspots that don't contain the point
     if hotspot.left <= x and hotspot.top <= y and
-       hotspot.right > x and hotspot.bottom > y and
-       hotspot.handlers[handler_type] ~= nil then
-      return widget, hotspot
+       hotspot.right > x and hotspot.bottom > y then
+      return hotspot
     end
   end
   
@@ -208,9 +181,9 @@ local function find_hotspot(widget, handler_type, x, y)
     
     -- cull widgets that don't contain the point
     if left <= x and top <= y and right > x and bottom > y then
-      local widget, hotspot = find_hotspot(record.widget, handler_type, x - left, y - top)
+      local hotspot = find_hotspot(record.widget, handler_type, x - left, y - top)
       if hotspot then
-        return widget, hotspot
+        return hotspot
       end
     end
   end
@@ -219,49 +192,91 @@ local function find_hotspot(widget, handler_type, x, y)
   return nil
 end
 
---- Resolves hotspot identifiers and executes the appropriate handler.
--- @param flags The flags to pass to the handler.
--- @param id The hotspot ID to be resolved into a window identifier.
--- @param handler_type The type of hotspot handler to execute.
-local execute_handler = function(flags, name, handler_type)
-  -- * Get view object from hotspot name
-  local _, _, view_name, x, y = name:find("(w%d+_%w+)-h%((%d+),(%d+)%)")
-  local view = views[view_name]
-  x, y = tonumber(x), tonumber(y)
+--- Resolves mouse events to a matching hotspot
+-- name: The hotspot's ID, which should match the name of a view.
+-- x, y: The coordinates the mouse event originated from.
+local function resolve_hotspot(name, x, y)
+  -- * Get view object from hotspot name.
+  local view = views[name]
   
-  -- * Recurse through child widgets until a hotspot with the right handler
-  --   has been found.
-  local widget, hotspot = find_hotspot(view.child, handler_type, x, y)
-  
-  -- * Execute the handler.
-  if hotspot then
-    return hotspot:ExecuteHandler(view, widget, handler_type, flags)
-  end
+  -- * Recurse through child widgets until a hotspot has been found.
+  return find_hotspot(view.child, x, y)
 end
 
 --- Base handlers that forward events through execute_handler()
--- to the appropriate widget's hotspots
+--  to the appropriate widget's hotspots
 View.hotspot_handlers = {
   mouseover = function(flags, id)
-    return execute_handler(flags, id, "mouseover")
+    local view = views[id]
+    
+    local x, y = WindowInfo(id, 14), WindowInfo(id, 15)
+    local hotspot = resolve_hotspot(id, x, y)
+    
+    if hotspot ~= view.hotspot_over then
+      -- first send a cancelmouseover to the old hotspot
+      if view.hotspot_over ~= nil then
+        view.hotspot_over:ExecuteHandler("cancelmouseover", new_mouse_event(view, x, y, flags))
+      end
+      
+      -- then send a mouseover to the new hotspot
+      if hotspot ~= nil then
+        hotspot:ExecuteHandler("mouseover", new_mouse_event(view, x, y, flags))
+      end
+      
+      view.hotspot_over = hotspot
+    end
   end,
   cancelmouseover = function(flags, id)
-    return execute_handler(flags, id, "cancelmouseover")
+    local view = views[id]
+    
+    if view.hotspot_over ~= nil then
+      local x, y = WindowInfo(id, 14), WindowInfo(id, 15)
+      
+      view.hotspot_over:ExecuteHandler("cancelmouseover", new_mouse_event(view, x, y, flags))
+      
+      view.hotspot_over = nil
+    end
   end,
   mousedown = function(flags, id)
-    return execute_handler(flags, id, "mousedown")
+    local view = views[id]
+    
+    local x, y = WindowInfo(id, 14), WindowInfo(id, 15)
+    local hotspot = resolve_hotspot(id, x, y)
+    if hotspot ~= nil then
+      hotspot:ExecuteHandler("mousedown", new_mouse_event(view, x, y, flags))
+      
+      view.hotspot_down = hotspot
+    end
   end,
   cancelmousedown = function(flags, id)
-    return execute_handler(flags, id, "cancelmousedown")
+    local view = views[id]
+    
+    local hotspot = view.hotspot_down
+    if hotspot ~= nil then
+      local x, y = WindowInfo(id, 14), WindowInfo(id, 15)
+      
+      hotspot:ExecuteHandler("cancelmousedown", new_mouse_event(view, x, y, flags))
+      
+      view.hotspot_down = nil
+    end
   end,
   mouseup = function(flags, id)
-    return execute_handler(flags, id, "mouseup")
+    local view = views[id]
+    
+    local hotspot = view.hotspot_down
+    if hotspot ~= nil then
+      local x, y = WindowInfo(id, 14), WindowInfo(id, 15)
+      
+      hotspot:ExecuteHandler("mouseup", new_mouse_event(view, x, y, flags))
+      
+      view.hotspot_down = nil
+    end
   end,
   dragmove = function(flags, id)
-    return execute_handler(flags, id, "dragmove")
+    -- TODO: disabled for now
   end,
   dragrelease = function(flags, id)
-    return execute_handler(flags, id, "dragrelease")
+    -- TODO: disabled for now
   end,
 }
 

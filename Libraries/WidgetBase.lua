@@ -28,8 +28,8 @@ function WidgetBase.new(width, height)
   o.width = width or 1
   o.height = height or 1
   o.canvas = Canvas.new(o.width, o.height)
-  o.invalidated = {}
   
+  o.invalidated = {}
   o.children = {}
   o.hotspots = {}
   
@@ -45,6 +45,8 @@ function Instance:GetView(x, y)
 end
 
 function Instance:AddChild(widget, x, y, name)
+  -- TODO: Add recursive check of 'widget's descendants to ensure
+  -- that this doesn't create a hierarchy loop.
   table.insert(self.children, {
     widget = widget,
     x = x,
@@ -52,11 +54,11 @@ function Instance:AddChild(widget, x, y, name)
   })
 end
 
-function Instance:AddHotspot(name, left, top, right, bottom)
+function Instance:SetHotspot(name, left, top, right, bottom)
   local hotspot = self.hotspots[name]
   
   if not hotspot then
-    hotspot = Hotspot.new(name, left, top, right, bottom)
+    hotspot = Hotspot.new(name, self, left, top, right, bottom)
     
     table.insert(self.hotspots, hotspot)
     self.hotspots[name] = hotspot

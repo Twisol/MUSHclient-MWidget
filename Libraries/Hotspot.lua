@@ -1,6 +1,8 @@
 local MWidget = require("MWidget")
 
 local Instance = {
+  GetOwner = nil,
+  
   SetHandler = nil,
   ExecuteHandler = nil,
 }
@@ -14,10 +16,12 @@ local Hotspot = {
 }
 setmetatable(Hotspot, Hotspot)
 
-function Hotspot.new(name, left, top, right, bottom)
+function Hotspot.new(name, owner, left, top, right, bottom)
   local o = setmetatable({}, Hotspot)
   
   o.name = name
+  o.owner = owner
+  
   o.left = left
   o.top = top
   o.right = right
@@ -28,15 +32,19 @@ function Hotspot.new(name, left, top, right, bottom)
   return o
 end
 
+function Instance:GetOwner()
+  return self.owner
+end
+
 function Instance:SetHandler(handler_type, func)
   self.handlers[handler_type] = func
 end
 
-function Instance:ExecuteHandler(view, widget, handler_type, flags)
+function Instance:ExecuteHandler(handler_type, event)
   local handler = self.handlers[handler_type]
   if not handler then return false end
   
-  handler(view, widget, self, flags or 0)
+  handler(self, event, event_type)
   return true
 end
 
