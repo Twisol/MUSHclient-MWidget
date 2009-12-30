@@ -37,6 +37,12 @@ setmetatable(View, View)
 
 
 local function init_hotspots(self)
+  self.mouse_record = {
+    hotspot = nil,
+    view_x = 0, view_y = 0,
+    widget_x = 0, widget_y = 0,
+  }
+  
   check(WindowAddHotspot(self.name, self.name, 0, 0, 0, 0,
      "MWidget.View.hotspot_handlers.mouseover",
      "MWidget.View.hotspot_handlers.cancelmouseover",
@@ -126,7 +132,7 @@ function Instance:Anchor(anchor)
 end
 
 function Instance:GetPosition()
-  if self.position.anchor == -1 then
+  if self.anchor == -1 then
     return self.x, self.y, self.anchor
   else
     return WindowInfo(self.name, 10), WindowInfo(self.name, 11), self.anchor
@@ -144,13 +150,14 @@ end
 
 
 local function new_mouse_event(view, x, y, flags)
+  local view_x, view_y = WindowInfo(view.name, 14), WindowInfo(view.name, 15)
   return {
     view = view,
     
     widget_x = x,
     widget_y = y,
-    output_x = view.x + x,
-    output_y = view.y + y,
+    output_x = view_x + x,
+    output_y = view_y + y,
     
     shift_key = bit.band(flags, 0x01) ~= 0,
     ctrl_key = bit.band(flags, 0x02) ~= 0,
@@ -169,7 +176,7 @@ local function find_hotspot(widget, x, y)
     -- cull hotspots that don't contain the point
     if hotspot.left <= x and hotspot.top <= y and
        hotspot.right > x and hotspot.bottom > y then
-      return hotspot
+      return hotspot, x, y
     end
   end
   
@@ -181,10 +188,7 @@ local function find_hotspot(widget, x, y)
     
     -- cull widgets that don't contain the point
     if left <= x and top <= y and right > x and bottom > y then
-      local hotspot = find_hotspot(record.widget, handler_type, x - left, y - top)
-      if hotspot then
-        return hotspot
-      end
+      return find_hotspot(record.widget, handler_type, x - left, y - top)
     end
   end
   
@@ -192,84 +196,113 @@ local function find_hotspot(widget, x, y)
   return nil
 end
 
---- Resolves mouse events to a matching hotspot
--- name: The hotspot's ID, which should match the name of a view.
--- x, y: The coordinates the mouse event originated from.
-local function resolve_hotspot(name, x, y)
-  -- * Get view object from hotspot name.
-  local view = views[name]
-  
-  -- * Recurse through child widgets until a hotspot has been found.
-  return find_hotspot(view.child, x, y)
-end
-
---- Base handlers that forward events through execute_handler()
+--- Base handlers that forward events through find_hotspot()
 --  to the appropriate widget's hotspots
 View.hotspot_handlers = {
   mouseover = function(flags, id)
+    --- * Collect important mouse data
+    
     local view = views[id]
+    local view_x, view_y = WindowInfo(id, 14), WindowInfo(id, 15)
     
-    local x, y = WindowInfo(id, 14), WindowInfo(id, 15)
-    local hotspot = resolve_hotspot(id, x, y)
+    -- Locate the hotspot that the mouse is currently over.
+    -- x and y are relative to the hotspot's widget.
+    local hotspot, x, y = find_hotspot(view.child, view_x, view_y)
     
-    if hotspot ~= view.hotspot_over then
+    --- * Fire events if necessary
+    
+    -- if we've moved into another hotspot
+    if hotspot ~= view.mouse_record.hotspot then
       -- first send a cancelmouseover to the old hotspot
-      if view.hotspot_over ~= nil then
-        view.hotspot_over:ExecuteHandler("cancelmouseover", new_mouse_event(view, x, y, flags))
+      if view.mouse_record.hotspot ~= nil then
+        view.mouse_record.hotspot:ExecuteHandler(
+           "cancelmouseover",
+           new_mouse_event(view, x, y, flags)
+        )
       end
       
       -- then send a mouseover to the new hotspot
       if hotspot ~= nil then
-        hotspot:ExecuteHandler("mouseover", new_mouse_event(view, x, y, flags))
+        hotspot:ExecuteHandler(
+           "mouseover",
+           new_mouse_event(view, x, y, flags)
+        )
       end
-      
-      view.hotspot_over = hotspot
     end
+    
+    --- * Update the mouse record
+    
+    view.mouse_record.hotspot = hotspot
+    view.mouse_record.widget_x = x
+    view.mouse_record.widget_y = y
+    view.mouse_record.view_x = view_x
+    view.mouse_record.view_y = view_y
   end,
   cancelmouseover = function(flags, id)
     local view = views[id]
     
-    if view.hotspot_over ~= nil then
-      local x, y = WindowInfo(id, 14), WindowInfo(id, 15)
-      
-      view.hotspot_over:ExecuteHandler("cancelmouseover", new_mouse_event(view, x, y, flags))
-      
-      view.hotspot_over = nil
+    -- get current widget-relative mouse position
+    local view_x, view_y = WindowInfo(id, 14), WindowInfo(id, 15)
+    local x = view_x - view.mouse_record.view_x + view.mouse_record.widget_x
+    local y = view_y - view.mouse_record.view_y + view.mouse_record.widget_y
+    
+    if view.mouse_record.hotspot ~= nil then
+      -- only send the cancelmouseover if it really left the view.
+      -- if the event was fired from within the view area, then
+      -- a mousedown is likely to follow instead.
+      if view_x < 0 or x >= view.width or
+         view_y < 0 or y >= view.height then
+        view.mouse_record.hotspot:ExecuteHandler(
+           "cancelmouseover",
+           new_mouse_event(view, x, y, flags)
+        )
+        
+        --- * Update the mouse record (only if there was really a cancelmouseover)
+        view.mouse_record.hotspot = nil
+        view.mouse_record.widget_x = x
+        view.mouse_record.widget_y = y
+        view.mouse_record.view_x = view_x
+        view.mouse_record.view_y = view_y
+      end
     end
   end,
   mousedown = function(flags, id)
     local view = views[id]
     
-    local x, y = WindowInfo(id, 14), WindowInfo(id, 15)
-    local hotspot = resolve_hotspot(id, x, y)
+    -- get current widget-relative mouse position
+    local view_x, view_y = WindowInfo(id, 14), WindowInfo(id, 15)
+    local x = view_x - view.mouse_record.view_x + view.mouse_record.widget_x
+    local y = view_y - view.mouse_record.view_y + view.mouse_record.widget_y
+    
+    local hotspot = view.mouse_record.hotspot
     if hotspot ~= nil then
       hotspot:ExecuteHandler("mousedown", new_mouse_event(view, x, y, flags))
-      
-      view.hotspot_down = hotspot
     end
   end,
   cancelmousedown = function(flags, id)
     local view = views[id]
     
-    local hotspot = view.hotspot_down
+    -- get current widget-relative mouse position
+    local view_x, view_y = WindowInfo(id, 14), WindowInfo(id, 15)
+    local x = view_x - view.mouse_record.view_x + view.mouse_record.widget_x
+    local y = view_y - view.mouse_record.view_y + view.mouse_record.widget_y
+    
+    local hotspot = view.mouse_record.hotspot
     if hotspot ~= nil then
-      local x, y = WindowInfo(id, 14), WindowInfo(id, 15)
-      
       hotspot:ExecuteHandler("cancelmousedown", new_mouse_event(view, x, y, flags))
-      
-      view.hotspot_down = nil
     end
   end,
   mouseup = function(flags, id)
     local view = views[id]
     
-    local hotspot = view.hotspot_down
+    -- get current widget-relative mouse position
+    local view_x, view_y = WindowInfo(id, 14), WindowInfo(id, 15)
+    local x = view_x - view.mouse_record.view_x + view.mouse_record.widget_x
+    local y = view_y - view.mouse_record.view_y + view.mouse_record.widget_y
+    
+    local hotspot = view.mouse_record.hotspot
     if hotspot ~= nil then
-      local x, y = WindowInfo(id, 14), WindowInfo(id, 15)
-      
       hotspot:ExecuteHandler("mouseup", new_mouse_event(view, x, y, flags))
-      
-      view.hotspot_down = nil
     end
   end,
   dragmove = function(flags, id)
