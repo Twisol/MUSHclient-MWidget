@@ -5,6 +5,8 @@ local Instance = {
   
   SetHandler = nil,
   ExecuteHandler = nil,
+  
+  ContainsPoint = nil,
 }
 
 local Hotspot = {
@@ -36,16 +38,21 @@ function Instance:GetOwner()
   return self.owner
 end
 
-function Instance:SetHandler(handler_type, func)
-  self.handlers[handler_type] = func
+function Instance:SetHandler(event_type, func)
+  self.handlers[event_type] = func
 end
 
-function Instance:ExecuteHandler(handler_type, event)
-  local handler = self.handlers[handler_type]
+function Instance:ExecuteHandler(event_type, event)
+  print(event_type)
+  local handler = self.handlers[event_type]
   if not handler then return false end
   
   handler(self, event, event_type)
-  return true
+end
+
+function Instance:ContainsPoint(x, y)
+  return (x >= self.left and x < self.right and
+          y >= self.top and y < self.bottom)
 end
 
 MWidget.Hotspot = Hotspot
